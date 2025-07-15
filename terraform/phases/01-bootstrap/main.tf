@@ -166,6 +166,13 @@ module "cert_manager" {
 }
 
 # Módulo de Vault Bootstrap (solo infraestructura)
+resource "kubernetes_service_account" "vault" {
+  metadata {
+    name      = "vault"
+    namespace = "vault"
+  }
+}
+
 module "vault_bootstrap" {
   source = "../../modules/vault-bootstrap"
 
@@ -214,6 +221,8 @@ module "vault_bootstrap" {
       }
     }
   }
+
+  service_account = kubernetes_service_account.vault.metadata[0].name
 
   depends_on = [module.cert_manager]
 }

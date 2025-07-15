@@ -63,7 +63,6 @@ COMANDOS DE GESTIÓN:
   status          Mostrar estado de Vault y fases
   init            Inicializar Vault directamente (alternativa a fase 2)
   unseal          Unseal manual para desarrollo
-  configure-auth  Configurar autenticación de Kubernetes en Vault
   backup          Crear backup de Vault
   restore         Restaurar backup de Vault
   reset           Resetear Vault (¡DESTRUCTIVO!)
@@ -172,76 +171,6 @@ check_prerequisites() {
     success "✅ Prerequisitos verificados"
 }
 
-# Función para configurar autenticación de Vault automáticamente
-configure_vault_auth() {
-    log "🔐 Configurando autenticación de Vault automáticamente..."
-    
-    # Verificar que Vault esté disponible
-    if ! kubectl exec -it vault-0 -n vault -- vault status > /dev/null 2>&1; then
-        error "Vault no está disponible o no está dessellado"
-        return 1
-    fi
-    
-    # Crear políticas de Vault
-    log "📝 Creando políticas de Vault..."
-    kubectl exec -it vault-0 -n vault -- sh -c "
-    export VAULT_TOKEN=\$(cat /vault/data/vault-init.json | jq -r '.root_token') && 
-    vault policy write database-policy - <<EOF
-path \"secret/data/database/*\" {
-  capabilities = [\"read\"]
-}
-EOF
-    "
-    
-    kubectl exec -it vault-0 -n vault -- sh -c "
-    export VAULT_TOKEN=\$(cat /vault/data/vault-init.json | jq -r '.root_token') && 
-    vault policy write identity-policy - <<EOF
-path \"secret/data/identity/*\" {
-  capabilities = [\"read\"]
-}
-path \"secret/data/database/*\" {
-  capabilities = [\"read\"]
-}
-EOF
-    "
-    
-    kubectl exec -it vault-0 -n vault -- sh -c "
-    export VAULT_TOKEN=\$(cat /vault/data/vault-init.json | jq -r '.root_token') && 
-    vault policy write monitoring-policy - <<EOF
-path \"secret/data/monitoring/*\" {
-  capabilities = [\"read\"]
-}
-EOF
-    "
-    
-    # Crear roles de autenticación de Kubernetes
-    log "🔑 Creando roles de autenticación de Kubernetes..."
-    kubectl exec -it vault-0 -n vault -- sh -c "
-    export VAULT_TOKEN=\$(cat /vault/data/vault-init.json | jq -r '.root_token') && 
-    vault write auth/kubernetes/role/database-role \
-      bound_service_account_names=postgres \
-      bound_service_account_namespaces=database \
-      policies=database-policy ttl=1h
-    "
-    
-    kubectl exec -it vault-0 -n vault -- sh -c "
-    export VAULT_TOKEN=\$(cat /vault/data/vault-init.json | jq -r '.root_token') && 
-    vault write auth/kubernetes/role/identity-role \
-      bound_service_account_names=zitadel \
-      bound_service_account_namespaces=identity \
-      policies=identity-policy ttl=1h
-    "
-    
-    kubectl exec -it vault-0 -n vault -- sh -c "
-    export VAULT_TOKEN=\$(cat /vault/data/vault-init.json | jq -r '.root_token') && 
-    vault write auth/kubernetes/role/monitoring-role \
-      bound_service_account_names=grafana \
-      bound_service_account_namespaces=monitoring \
-      policies=monitoring-policy ttl=1h
-    "
-    
-    success "✅ Autenticación de Vault configurada automáticamente"
-}
 
 # Función para ejecutar Terraform en una fase
 run_terraform_phase() {
@@ -425,15 +354,6 @@ execute_phase() {
             
             run_terraform_phase "03-secrets"
             
-            # Configurar autenticación automáticamente después de la fase 3
-            log "🔐 Configurando autenticación de Vault automáticamente..."
-            configure_vault_auth
-            
-            # Configurar autenticación de Kubernetes después de crear los secretos
-            log "🔧 Configurando autenticación de Kubernetes..."
-            if [ -f "$SCRIPT_DIR/configure-vault-auth.sh" ]; then
-                "$SCRIPT_DIR/configure-vault-auth.sh" || warning "Error en configuración de autenticación"
-            fi
             
             success "✅ Fase 3 completada: Secretos configurados en Vault"
             ;;
@@ -724,15 +644,19 @@ init_vault_direct() {
         if [ $? -eq 0 ]; then
             log "✅ Vault inicializado exitosamente"
             
-            # Guardar claves en archivo temporal
-            echo "$init_result" > "$VAULT_DATA_DIR/vault-init.json"
-            chmod 600 "$VAULT_DATA_DIR/vault-init.json"
-            
             # Extraer token root y claves
             local root_token=$(echo "$init_result" | jq -r '.root_token')
-            local unseal_key_1=$(echo "$init_result" | jq -r '.unseal_keys_b64[0]')
-            local unseal_key_2=$(echo "$init_result" | jq -r '.unseal_keys_b64[1]')
-            local unseal_key_3=$(echo "$init_result" | jq -r '.unseal_keys_b64[2]')
+            local unseal_keys=$(echo "$init_result" | jq -r '.unseal_keys_b64 | .[]')
+
+            log "VAULT_ROOT_TOKEN: $root_token"
+            log "VAULT_UNSEAL_KEYS:"
+            echo "$unseal_keys" | while read -r key; do
+                log "$key"
+            done
+
+            local unseal_key_1=$(echo "$unseal_keys" | sed -n 1p)
+            local unseal_key_2=$(echo "$unseal_keys" | sed -n 2p)
+            local unseal_key_3=$(echo "$unseal_keys" | sed -n 3p)
             
             # Realizar unseal
             log "🔓 Realizando unseal..."
@@ -757,34 +681,17 @@ init_vault_direct() {
         
     elif [ "$sealed" = "true" ]; then
         log "🔓 Vault está inicializado pero sellado, intentando unseal..."
-        if [ -f "$VAULT_DATA_DIR/vault-init.json" ]; then
-            local unseal_key_1=$(jq -r '.unseal_keys_b64[0]' "$VAULT_DATA_DIR/vault-init.json")
-            local unseal_key_2=$(jq -r '.unseal_keys_b64[1]' "$VAULT_DATA_DIR/vault-init.json") 
-            local unseal_key_3=$(jq -r '.unseal_keys_b64[2]' "$VAULT_DATA_DIR/vault-init.json")
-            vault operator unseal "$unseal_key_1"
-            vault operator unseal "$unseal_key_2"
-            vault operator unseal "$unseal_key_3"
-            local root_token=$(jq -r '.root_token' "$VAULT_DATA_DIR/vault-init.json")
-            export VAULT_TOKEN="$root_token"
+        if [ -n "$VAULT_UNSEAL_KEY" ]; then
+            log "Usando VAULT_UNSEAL_KEY para unseal..."
+            local unseal_keys=$(echo "$VAULT_UNSEAL_KEY" | tr "," "\n")
+            echo "$unseal_keys" | while read -r key; do
+                vault operator unseal "$key"
+            done
             success "✅ Vault unsealed exitosamente"
         else
             error "❌ Vault está inicializado pero sellado, y no se encontraron las claves de unseal."
-            error "   Esto puede ocurrir si:"
-            error "   - Las claves de unseal se perdieron o no se guardaron"
-            error "   - Vault fue inicializado en otro entorno"
-            error ""
-            error "   SOLUCIONES DISPONIBLES:"
-            error "   1. Si tienes las claves de unseal originales:"
-            error "      - Ejecuta: kubectl exec -n vault vault-0 -- vault operator unseal"
-            error "      - Introduce las claves una por una"
-            error ""
-            error "   2. Para resetear Vault completamente (¡DESTRUCTIVO!):"
-            error "      - Ejecuta: $0 2 --force-reset"
-            error "      - Esto eliminará TODOS los secretos almacenados en Vault"
-            error ""
-            error "   3. Para desarrollo/entornos de prueba:"
-            error "      - Usa la opción --force-reset para automatizar el reseteo"
-            error ""
+            error "   Por favor, proporciona las claves de unseal usando la variable de entorno VAULT_UNSEAL_KEY."
+            error "   export VAULT_UNSEAL_KEY=\\\"key1,key2,key3\\\""
             kill $pf_pid >/dev/null 2>&1 || true
             return 1
         fi
@@ -1023,14 +930,6 @@ main() {
             ;;
         unseal)
             unseal_vault
-            ;;
-        configure-auth)
-            if [ -f "$SCRIPT_DIR/configure-vault-auth.sh" ]; then
-                "$SCRIPT_DIR/configure-vault-auth.sh"
-            else
-                error "Script de configuración de autenticación no encontrado"
-                exit 1
-            fi
             ;;
         port-forward)
             setup_port_forward

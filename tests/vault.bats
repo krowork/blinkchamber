@@ -6,6 +6,12 @@
   [[ "$output" == *"NAME"* ]]
 }
 
+@test "Vault Service Account" {
+  run kubectl get serviceaccount vault -n vault
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"NAME"* ]]
+}
+
 @test "Vault Services" {
   run kubectl get services -n vault
   [ "$status" -eq 0 ]
