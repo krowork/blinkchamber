@@ -51,6 +51,10 @@
 
 ### 1. Prerequisitos
 
+- Un cluster de Kubernetes (ej. Kind, Minikube, o un proveedor de nube)
+- Un Ingress Controller (ej. NGINX Ingress Controller)
+- Cert-Manager
+
 ```bash
 # Herramientas requeridas
 curl -s https://raw.githubusercontent.com/blinkchamber/blinkchamber/main/scripts/install-deps.sh | bash

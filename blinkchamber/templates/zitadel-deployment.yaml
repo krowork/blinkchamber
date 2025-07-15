@@ -1,4 +1,4 @@
-{{- if .Values.zitadel.enabled }}
+{{- if (eq (include "common.components.identity.enabled" .) "true") }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -35,7 +35,7 @@ spec:
         - name: zitadel
           image: ghcr.io/zitadel/zitadel:v2.42.0
           ports:
-            - containerPort: {{ .Values.zitadel.service.port }}
+            - containerPort: {{ .Values.identity.zitadel_config.service.port }}
               name: http
           env:
             - name: ZITADEL_MASTERKEY
@@ -54,11 +54,11 @@ spec:
                   name: vault-secrets
                   key: zitadel_admin_password
             - name: ZITADEL_DATABASE_POSTGRES_HOST
-              value: {{ .Values.zitadel.config.database.postgres.host | quote }}
+              value: {{ .Values.identity.zitadel_config.config.database.postgres.host | quote }}
             - name: ZITADEL_DATABASE_POSTGRES_PORT
-              value: {{ .Values.zitadel.config.database.postgres.port | quote }}
+              value: {{ .Values.identity.zitadel_config.config.database.postgres.port | quote }}
             - name: ZITADEL_DATABASE_POSTGRES_DATABASE
-              value: {{ .Values.zitadel.config.database.postgres.database | quote }}
+              value: {{ .Values.identity.zitadel_config.config.database.postgres.database | quote }}
             - name: ZITADEL_DATABASE_POSTGRES_USER_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -80,27 +80,27 @@ spec:
                   name: vault-secrets
                   key: postgres_password
             - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
-              value: {{ .Values.zitadel.config.database.postgres.sslMode | quote }}
+              value: {{ .Values.identity.zitadel_config.config.database.postgres.sslMode | quote }}
             - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
-              value: {{ .Values.zitadel.config.database.postgres.sslMode | quote }}
+              value: {{ .Values.identity.zitadel_config.config.database.postgres.sslMode | quote }}
             - name: ZITADEL_SMTP_HOST
-              value: {{ .Values.zitadel.config.smtp.host | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.host | quote }}
             - name: ZITADEL_SMTP_PORT
-              value: {{ .Values.zitadel.config.smtp.port | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.port | quote }}
             - name: ZITADEL_SMTP_USER
-              value: {{ .Values.zitadel.config.smtp.user | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.user | quote }}
             - name: ZITADEL_SMTP_PASSWORD
-              value: {{ .Values.zitadel.config.smtp.password | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.password | quote }}
             - name: ZITADEL_SMTP_FROM_ADDRESS
-              value: {{ .Values.zitadel.config.smtp.fromAddress | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.fromAddress | quote }}
             - name: ZITADEL_SMTP_TLS
-              value: {{ .Values.zitadel.config.smtp.tls | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.tls | quote }}
             - name: ZITADEL_SMTP_STARTTLS
-              value: {{ .Values.zitadel.config.smtp.startTLS | quote }}
+              value: {{ .Values.identity.zitadel_config.config.smtp.startTLS | quote }}
             - name: ZITADEL_EXTERNALSECURE
-              value: {{ .Values.zitadel.config.externalSecure | quote }}
+              value: {{ .Values.identity.zitadel_config.config.externalSecure | quote }}
             - name: ZITADEL_TLS_ENABLED
-              value: {{ .Values.zitadel.config.tls.enabled | quote }}
+              value: {{ .Values.identity.zitadel_config.config.tls.enabled | quote }}
           volumeMounts:
             - name: vault-secrets
               mountPath: /vault/secrets
@@ -116,17 +116,17 @@ spec:
           livenessProbe:
             httpGet:
               path: /debug/healthz
-              port: {{ .Values.zitadel.service.port }}
+              port: {{ .Values.identity.zitadel_config.service.port }}
             initialDelaySeconds: 60
             periodSeconds: 30
           readinessProbe:
             httpGet:
               path: /debug/ready
-              port: {{ .Values.zitadel.service.port }}
+              port: {{ .Values.identity.zitadel_config.service.port }}
             initialDelaySeconds: 30
             periodSeconds: 10
           resources:
-            {{- toYaml .Values.zitadel.resources | nindent 12 }}
+            {{- toYaml .Values.identity.resources | nindent 12 }}
         - name: vault-agent
           image: hashicorp/vault:1.15.2
           args:
@@ -289,10 +289,10 @@ spec:
     app.kubernetes.io/component: zitadel
   ports:
   - name: http
-    port: {{ .Values.zitadel.service.port }}
-    targetPort: {{ .Values.zitadel.service.port }}
-  type: {{ .Values.zitadel.service.type }}
-{{- if .Values.zitadel.ingress.enabled }}
+    port: {{ .Values.identity.zitadel_config.service.port }}
+    targetPort: {{ .Values.identity.zitadel_config.service.port }}
+  type: {{ .Values.identity.zitadel_config.service.type }}
+{{- if .Values.identity.zitadel_config.ingress.enabled }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -312,7 +312,7 @@ spec:
   {{- end }}
   {{- if .Values.global.tls.enabled }}
   tls:
-  {{- range .Values.zitadel.ingress.tls }}
+  {{- range .Values.identity.zitadel_config.ingress.tls }}
     - hosts:
     {{- range .hosts }}
       - {{ . | quote }}
@@ -321,7 +321,7 @@ spec:
   {{- end }}
   {{- end }}
   rules:
-  {{- range .Values.zitadel.ingress.hosts }}
+  {{- range .Values.identity.zitadel_config.ingress.hosts }}
     - host: {{ .host | quote }}
       http:
         paths:
@@ -332,7 +332,7 @@ spec:
               service:
                 name: {{ include "blinkchamber.fullname" $ }}-zitadel
                 port:
-                  number: {{ $.Values.zitadel.service.port }}
+                  number: {{ $.Values.identity.zitadel_config.service.port }}
         {{- end }}
   {{- end }}
 {{- end }}

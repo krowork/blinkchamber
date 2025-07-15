@@ -60,3 +60,16 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Get component enabled status from config
+*/}}
+{{- define "common.components.identity.enabled" -}}
+{{- $identityEnabled := false }}
+{{- range .Values.components.essential }}
+{{- if eq .name "identity" }}
+{{- $identityEnabled = .enabled }}
+{{- end }}
+{{- end }}
+{{- $identityEnabled }}
+{{- end }}

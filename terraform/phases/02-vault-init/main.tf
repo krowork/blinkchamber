@@ -52,8 +52,7 @@ provider "kubectl" {
 }
 
 provider "vault" {
-  address = "http://vault.vault.svc.cluster.local:8200"
-  token   = var.vault_token
+  address = var.vault_address
 }
 
 # Variables principales
@@ -129,10 +128,10 @@ variable "azure_key_name" {
   default     = ""
 }
 
-variable "vault_token" {
-  description = "Token de Vault para configuración"
+variable "vault_address" {
+  description = "Dirección de Vault"
   type        = string
-  default     = ""
+  default     = "http://vault.vault.svc.cluster.local:8200"
 }
 
 # Datos de la fase anterior
@@ -344,20 +343,6 @@ resource "kubernetes_job" "vault_init" {
               ROOT_TOKEN=$(cat /tmp/vault-init.json | jq -r '.root_token')
               export VAULT_TOKEN=$ROOT_TOKEN
               
-              # Si no hay auto-unseal, realizar unseal manual
-              if [ "${tostring(local.auto_unseal_config.enabled)}" != "true" ]; then
-                echo "🔓 Realizando unseal manual..."
-                UNSEAL_KEY_1=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[0]')
-                UNSEAL_KEY_2=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[1]')
-                UNSEAL_KEY_3=$(cat /tmp/vault-init.json | jq -r '.unseal_keys_b64[2]')
-                
-                vault operator unseal $UNSEAL_KEY_1
-                vault operator unseal $UNSEAL_KEY_2
-                vault operator unseal $UNSEAL_KEY_3
-                
-                echo "✅ Vault unsealed exitosamente"
-              fi
-              
               # Configurar autenticación de Kubernetes
               echo "🔧 Configurando autenticación de Kubernetes..."
               
@@ -400,14 +385,6 @@ resource "kubernetes_job" "vault_init" {
               EOF
               
               echo "✅ Políticas básicas creadas"
-              
-              # Guardar token root en secret separado (temporal)
-              kubectl create secret generic vault-root-token \
-                --from-literal=token=$ROOT_TOKEN \
-                --namespace=${var.vault_namespace} \
-                --dry-run=client -o yaml | kubectl apply -f -
-              
-              echo "💾 Root token guardado en secret/vault-root-token"
               
               # Verificación final
               echo "🔍 Verificación final..."
