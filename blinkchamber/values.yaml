@@ -1,0 +1,392 @@
+# BlinkChamber - Sistema de gestión de identidad y secretos autocontenido
+# =============================================================================
+
+# Configuración global
+global:
+  environment: local
+  clusterName: blinkchamber
+  domain: blinkchamber.local
+
+  # Configuración de ingress
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: ca-issuer
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+
+  # Configuración de TLS
+  tls:
+    enabled: true
+
+  # Configuración de recursos por defecto
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# Configuración de Vault (usando chart oficial de HashiCorp)
+vault:
+  enabled: true
+
+  # Configuración de inicialización
+  init:
+    enabled: true
+
+  # Configuración del servidor
+  server:
+    enabled: true
+    ha:
+      enabled: true
+      replicas: 3
+    dev:
+      enabled: false
+    standalone:
+      enabled: false
+    config: |
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "consul" {
+        address = "consul-server.blinkchamber.svc:8500"
+        path    = "vault/"
+      }
+
+      service_registration "consul" {
+        address = "consul-server.blinkchamber.svc:8500"
+      }
+      disable_mlock = true
+
+    # Configuración de recursos
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+    # Configuración de persistencia
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: standard
+
+    # Configuración de ingress (deshabilitado para acceso interno)
+    ingress:
+      enabled: false
+
+  # Configuración del injector
+  injector:
+    enabled: true
+
+  # Configuración de UI
+  ui:
+    enabled: true
+    service:
+      type: ClusterIP
+
+# Configuración de PostgreSQL (usando chart oficial de Bitnami)
+postgresql:
+  enabled: true
+
+  # Configuración de la base de datos
+  auth:
+    postgresPassword: "postgres123"
+    database: "zitadel"
+    username: "postgres"
+    password: "postgres123"
+
+  # Configuración de recursos
+  primary:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+    # Configuración de persistencia
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: standard
+
+    # Configuración de servicio
+    service:
+      type: ClusterIP
+      port: 5432
+
+  # Configuración de ingress (opcional para debugging)
+  ingress:
+    enabled: false
+
+# Configuración de Zitadel (template personalizado)
+zitadel:
+  enabled: true
+
+  # Configuración de la aplicación
+  config:
+    masterkey: "masterkey123"
+    admin:
+      username: "admin"
+      password: "admin123"
+
+    # Configuración de base de datos
+    database:
+      postgres:
+        host: "blinkchamber-postgresql"
+        port: 5432
+        database: "zitadel"
+        username: "postgres"
+        password: "postgres123"
+        sslMode: "disable"
+
+    # Configuración de correo
+    smtp:
+      host: "blinkchamber-mailu"
+      port: 587
+      user: "admin@blinkchamber.local"
+      password: "admin123"
+      fromAddress: "noreply@blinkchamber.local"
+      tls: true
+      startTLS: true
+
+    # Configuración de seguridad
+    externalSecure: false
+    tls:
+      enabled: false
+
+  # Configuración de recursos
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+
+  # Configuración de servicio
+  service:
+    type: ClusterIP
+    port: 8080
+
+  # Configuración de ingress
+  ingress:
+    enabled: true
+    hosts:
+      - host: identity.blinkchamber.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: zitadel-tls
+        hosts:
+          - identity.blinkchamber.local
+
+# Configuración de Mailu (sistema de correo completo)
+mailu:
+  enabled: true
+
+  # Configuración de la aplicación
+  config:
+    hostname: "mail.blinkchamber.local"
+    secretKey: "" # Se obtiene de Vault
+    adminPassword: "" # Se obtiene de Vault
+
+    # Configuración de base de datos
+    database:
+      host: "blinkchamber-postgresql"
+      port: 5432
+      database: "mailu"
+      username: "mailu"
+      # La contraseña se obtiene de Vault
+
+    # Configuración de almacenamiento
+    storage:
+      path: "/data"
+      size: 10Gi
+
+    # Configuración de servicios
+    services:
+      web:
+        port: 80
+        sslPort: 443
+      smtp:
+        port: 25
+        sslPort: 587
+      imap:
+        port: 143
+        sslPort: 993
+      pop3:
+        port: 110
+        sslPort: 995
+
+  # Configuración de recursos
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  # Configuración de persistencia
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+
+  # Configuración de Vault Integration
+  vault_integration:
+    enabled: true
+    service_account: "mailu"
+    vault_role: "mail-role"
+    vault_secrets:
+      - name: "mailu-config"
+        path: "secret/data/mail/mailu"
+        template: |
+          MAILU_SECRET_KEY={{ .Data.data.secret_key }}
+          MAILU_ADMIN_PASSWORD={{ .Data.data.admin_password }}
+          MAILU_DB_PASSWORD={{ .Data.data.database_password }}
+    annotations:
+      vault.hashicorp.com/agent-inject: "true"
+      vault.hashicorp.com/role: "mail-role"
+      vault.hashicorp.com/agent-inject-secret-mailu: "secret/data/mail/mailu"
+      vault.hashicorp.com/agent-inject-template-mailu: |
+        {{- with secret "secret/data/mail/mailu" -}}
+        MAILU_SECRET_KEY={{ .Data.data.secret_key }}
+        MAILU_ADMIN_PASSWORD={{ .Data.data.admin_password }}
+        MAILU_DB_PASSWORD={{ .Data.data.database_password }}
+        {{- end }}
+
+  # Configuración de ingress
+  ingress:
+    enabled: true
+    hosts:
+      - host: mail.blinkchamber.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: mailu-tls
+        hosts:
+          - mail.blinkchamber.local
+
+# Configuración de Grafana (usando chart oficial)
+grafana:
+  enabled: true
+
+  # Configuración de la aplicación
+  adminPassword: "grafana123"
+
+  # Configuración de recursos
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  # Configuración de persistencia
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: standard
+
+  # Configuración de servicio
+  service:
+    type: ClusterIP
+    port: 3000
+
+  # Configuración de ingress
+  ingress:
+    enabled: true
+    hosts:
+      - host: monitoring.blinkchamber.local
+        paths:
+          - path: /grafana
+            pathType: Prefix
+    tls:
+      - secretName: grafana-tls
+        hosts:
+          - monitoring.blinkchamber.local
+
+# Configuración de Prometheus (usando chart oficial)
+prometheus:
+  enabled: true
+
+  # Configuración del servidor
+  server:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Configuración de persistencia
+    persistentVolume:
+      enabled: true
+      size: 8Gi
+      storageClass: standard
+
+  # Configuración de Vault Integration
+  vault_integration:
+    enabled: true
+    service_account: "prometheus"
+    vault_role: "monitoring-role"
+    vault_secrets:
+      - name: "prometheus-config"
+        path: "secret/data/monitoring/prometheus"
+        template: |
+          PROMETHEUS_ADMIN_USERNAME={{ .Data.data.admin_username }}
+          PROMETHEUS_ADMIN_PASSWORD={{ .Data.data.admin_password }}
+    annotations:
+      vault.hashicorp.com/agent-inject: "true"
+      vault.hashicorp.com/role: "monitoring-role"
+      vault.hashicorp.com/agent-inject-secret-prometheus: "secret/data/monitoring/prometheus"
+      vault.hashicorp.com/agent-inject-template-prometheus: |
+        {{- with secret "secret/data/monitoring/prometheus" -}}
+        PROMETHEUS_ADMIN_USERNAME={{ .Data.data.admin_username }}
+        PROMETHEUS_ADMIN_PASSWORD={{ .Data.data.admin_password }}
+        {{- end }}
+
+  # Configuración de ingress
+  ingress:
+    enabled: true
+    hosts:
+      - host: monitoring.blinkchamber.local
+        paths:
+          - path: /prometheus
+            pathType: Prefix
+    tls:
+      - secretName: prometheus-tls
+        hosts:
+          - monitoring.blinkchamber.local
+
+# Configuración de Ingress Controller (si no está instalado externamente)
+ingressController:
+  enabled: false # Asumimos que ya está instalado
+
+  # Configuración de NGINX Ingress Controller
+  nginx:
+    enabled: false
+    controller:
+      service:
+        type: NodePort
+
+# Configuración de Cert Manager (si no está instalado externamente)
+certManager:
+  enabled: false # Asumimos que ya está instalado

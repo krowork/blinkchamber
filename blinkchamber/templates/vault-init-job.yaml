@@ -1,0 +1,227 @@
+{{- if and .Values.vault.enabled .Values.vault.init.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-vault-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "blinkchamber.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: vault-init
+    spec:
+      serviceAccountName: {{ include "blinkchamber.fullname" . }}-vault-init
+      restartPolicy: OnFailure
+      containers:
+      - name: vault-init
+        image: bitnami/kubectl:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -e
+
+          echo "🔍 Verificando estado de Vault..."
+
+          # Esperar a que Vault esté listo
+          kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=vault -n {{ .Release.Namespace }} --timeout=300s
+
+          # Verificar si Vault ya está inicializado
+          VAULT_STATUS=$(kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault status -format=json 2>/dev/null || echo '{"initialized":false}')
+          INITIALIZED=$(echo "$VAULT_STATUS" | jq -r '.initialized // false')
+
+          if [[ "$INITIALIZED" == "true" ]]; then
+            echo "✅ Vault ya está inicializado"
+            exit 0
+          fi
+
+          echo "🚀 Inicializando Vault..."
+
+          # Inicializar Vault
+          INIT_RESPONSE=$(kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault operator init -key-shares=5 -key-threshold=3 -format=json)
+
+          # Extraer claves y token
+          UNSEAL_KEYS=$(echo "$INIT_RESPONSE" | jq -r '.unseal_keys_b64[]' | tr '\n' ',' | sed 's/,$//')
+          ROOT_TOKEN=$(echo "$INIT_RESPONSE" | jq -r '.root_token')
+
+          echo "🔓 Desellando Vault..."
+
+          # Desellar Vault con las primeras 3 claves
+          IFS=',' read -ra KEYS <<< "$UNSEAL_KEYS"
+          for i in {0..2}; do
+            kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault operator unseal "${KEYS[$i]}"
+          done
+
+          echo "🔧 Configurando Vault..."
+
+          # Configurar autenticación de Kubernetes
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault login "$ROOT_TOKEN"
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault auth enable kubernetes
+
+          # Configurar motor de secretos KV
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault secrets enable -path=secret kv-v2
+
+          # Crear secretos para todos los componentes (para Vault Agent Sidecar)
+          echo "📝 Creando secretos para Vault Agent Sidecar..."
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault kv put secret/database/postgres \
+            username=postgres \
+            password="$(openssl rand -base64 32)" \
+            database=postgres
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault kv put secret/identity/zitadel \
+            admin_username=admin \
+            admin_password="$(openssl rand -base64 16)" \
+            masterkey="$(openssl rand -hex 32)"
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault kv put secret/mail/mailu \
+            secret_key="$(openssl rand -hex 32)" \
+            admin_password="$(openssl rand -base64 16)" \
+            database_password="$(openssl rand -base64 32)"
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault kv put secret/monitoring/grafana \
+            admin_username=admin \
+            admin_password="$(openssl rand -base64 16)"
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault kv put secret/monitoring/prometheus \
+            admin_username=admin \
+            admin_password="$(openssl rand -base64 16)"
+
+          echo "🔐 Configurando roles y políticas para Vault Agent Sidecar..."
+
+          # Configurar roles de Kubernetes para cada aplicación
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault write auth/kubernetes/role/mailu-role \
+            bound_service_account_names=mailu-sa \
+            bound_service_account_namespaces={{ .Release.Namespace }} \
+            policies=mailu-policy \
+            ttl=1h
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault write auth/kubernetes/role/grafana-role \
+            bound_service_account_names=grafana-sa \
+            bound_service_account_namespaces={{ .Release.Namespace }} \
+            policies=grafana-policy \
+            ttl=1h
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault write auth/kubernetes/role/zitadel-role \
+            bound_service_account_names=zitadel-sa \
+            bound_service_account_namespaces={{ .Release.Namespace }} \
+            policies=zitadel-policy \
+            ttl=1h
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault write auth/kubernetes/role/prometheus-role \
+            bound_service_account_names=prometheus-sa \
+            bound_service_account_namespaces={{ .Release.Namespace }} \
+            policies=prometheus-policy \
+            ttl=1h
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault write auth/kubernetes/role/postgresql-role \
+            bound_service_account_names=postgresql-sa \
+            bound_service_account_namespaces={{ .Release.Namespace }} \
+            policies=postgresql-policy \
+            ttl=1h
+
+          # Crear políticas específicas para cada aplicación
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault policy write mailu-policy - <<EOF
+          path "secret/data/mail/mailu" {
+            capabilities = ["read"]
+          }
+          EOF
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault policy write grafana-policy - <<EOF
+          path "secret/data/monitoring/grafana" {
+            capabilities = ["read"]
+          }
+          EOF
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault policy write zitadel-policy - <<EOF
+          path "secret/data/identity/zitadel" {
+            capabilities = ["read"]
+          }
+          path "secret/data/database/postgres" {
+            capabilities = ["read"]
+          }
+          EOF
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault policy write prometheus-policy - <<EOF
+          path "secret/data/monitoring/prometheus" {
+            capabilities = ["read"]
+          }
+          EOF
+
+          kubectl exec -n {{ .Release.Namespace }} -l app.kubernetes.io/name=vault -- vault policy write postgresql-policy - <<EOF
+          path "secret/data/database/postgres" {
+            capabilities = ["read"]
+          }
+          EOF
+
+          echo "✅ Vault inicializado y configurado exitosamente para Vault Agent Sidecar"
+
+          # Guardar claves en secret (solo para desarrollo/backup)
+          kubectl create secret generic {{ include "blinkchamber.fullname" . }}-vault-keys \
+            --from-literal=unseal-keys="$UNSEAL_KEYS" \
+            --from-literal=root-token="$ROOT_TOKEN" \
+            -n {{ .Release.Namespace }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+        env:
+        - name: VAULT_ADDR
+          value: "http://{{ include "blinkchamber.fullname" . }}-vault:8200"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-vault-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault-init
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-vault-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault-init
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "secrets"]
+    verbs: ["get", "list", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-vault-init
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: vault-init
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "blinkchamber.fullname" . }}-vault-init
+subjects:
+- kind: ServiceAccount
+  name: {{ include "blinkchamber.fullname" . }}-vault-init
+  namespace: {{ .Release.Namespace }}
+{{- end }}

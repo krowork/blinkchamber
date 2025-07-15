@@ -1,0 +1,35 @@
+# BlinChamber - Configuración de Ejemplo
+# Copia este archivo a config/environment.local y modifica según tus necesidades
+
+# Configuración General
+CLUSTER_NAME=blinkchamber
+ENVIRONMENT=local
+
+# Credenciales por Defecto
+VAULT_ADDR=http://localhost:8200
+POSTGRES_PASSWORD=postgres123
+MINIO_ADMIN_USER=admin
+MINIO_ADMIN_PASSWORD=minio123
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
+
+# Dominios Locales
+VAULT_DOMAIN=vault.blinkchamber.local
+GRAFANA_DOMAIN=grafana.blinkchamber.local
+ZITADEL_DOMAIN=zitadel.blinkchamber.local
+MINIO_DOMAIN=minio.blinkchamber.local
+
+# Almacenamiento
+STORAGE_CLASS=longhorn
+VAULT_STORAGE_SIZE=10Gi
+POSTGRES_STORAGE_SIZE=20Gi
+MINIO_STORAGE_SIZE=20Gi
+
+# Réplicas
+VAULT_REPLICAS=3
+POSTGRES_REPLICAS=2
+MINIO_REPLICAS=2
+
+# Debug
+DEBUG_ENABLED=false
+VERBOSE_LOGGING=false 

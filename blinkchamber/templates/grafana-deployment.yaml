@@ -1,0 +1,248 @@
+{{- if .Values.grafana.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "blinkchamber.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: grafana
+  template:
+    metadata:
+      labels:
+        {{- include "blinkchamber.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: grafana
+    spec:
+      serviceAccountName: {{ include "blinkchamber.fullname" . }}-grafana-sa
+      initContainers:
+        - name: wait-vault-secrets
+          image: busybox:1.35
+          command: ['sh', '-c', 'while [ ! -f /vault/secrets/grafana_admin_password ]; do echo "Waiting for Vault secrets..."; sleep 2; done; echo "Vault secrets ready"']
+          volumeMounts:
+            - name: vault-secrets
+              mountPath: /vault/secrets
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.2.0
+          ports:
+            - containerPort: {{ .Values.grafana.service.port }}
+              name: http
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vault-secrets
+                  key: grafana_admin_password
+            - name: GF_SERVER_ROOT_URL
+              value: "https://grafana.{{ .Values.global.domain }}"
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "false"
+            - name: GF_INSTALL_PLUGINS
+              value: "grafana-piechart-panel,grafana-worldmap-panel"
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+            - name: vault-secrets
+              mountPath: /vault/secrets
+              readOnly: true
+          resources:
+            {{- toYaml .Values.grafana.resources | nindent 12 }}
+        - name: vault-agent
+          image: hashicorp/vault:1.15.2
+          args:
+            - "agent"
+            - "-config=/vault/config/agent-config.hcl"
+          env:
+            - name: VAULT_ADDR
+              value: "http://{{ include "blinkchamber.fullname" . }}-vault:8200"
+          volumeMounts:
+            - name: vault-secrets
+              mountPath: /vault/secrets
+            - name: vault-agent-config
+              mountPath: /vault/config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      volumes:
+        - name: grafana-storage
+          {{- if .Values.grafana.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "blinkchamber.fullname" . }}-grafana-pvc
+          {{- else }}
+          emptyDir:
+            sizeLimit: {{ .Values.grafana.persistence.size }}
+          {{- end }}
+        - name: vault-secrets
+          emptyDir:
+            medium: Memory
+        - name: vault-agent-config
+          configMap:
+            name: {{ include "blinkchamber.fullname" . }}-grafana-vault-agent-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana-vault-agent-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+data:
+  agent-config.hcl: |
+    exit_after_auth = false
+    pid_file = "/tmp/vault-agent-pid"
+    auto_auth {
+      method "kubernetes" {
+        mount_path = "auth/kubernetes"
+        config = {
+          role = "grafana-role"
+        }
+      }
+      sink "file" {
+        config = {
+          path = "/vault/secrets/vault-token"
+        }
+      }
+    }
+    template {
+      source      = "/vault/config/grafana-admin.tpl"
+      destination = "/vault/secrets/grafana_admin_password"
+    }
+    vault {
+      address = "http://{{ include "blinkchamber.fullname" . }}-vault:8200"
+    }
+  grafana-admin.tpl: |
+    {{`{{ with secret "secret/monitoring/grafana" }}`}}
+    {{`{{ .Data.data.admin_password }}`}}
+    {{`{{ end }}`}}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana-sa
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "blinkchamber.fullname" . }}-grafana-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "blinkchamber.fullname" . }}-grafana-sa
+  namespace: {{ .Release.Namespace }}
+{{- if .Values.grafana.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.grafana.persistence.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.grafana.persistence.size }}
+{{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  selector:
+    {{- include "blinkchamber.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+  ports:
+  - name: http
+    port: {{ .Values.grafana.service.port }}
+    targetPort: {{ .Values.grafana.service.port }}
+  type: {{ .Values.grafana.service.type }}
+{{- if .Values.grafana.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "blinkchamber.fullname" . }}-grafana
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "blinkchamber.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+  {{- with .Values.global.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.global.ingress.className }}
+  ingressClassName: {{ .Values.global.ingress.className }}
+  {{- end }}
+  {{- if .Values.global.tls.enabled }}
+  tls:
+  {{- range .Values.grafana.ingress.tls }}
+    - hosts:
+    {{- range .hosts }}
+      - {{ . | quote }}
+    {{- end }}
+      secretName: {{ .secretName }}
+  {{- end }}
+  {{- end }}
+  rules:
+  {{- range .Values.grafana.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+        {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                name: {{ include "blinkchamber.fullname" $ }}-grafana
+                port:
+                  number: {{ $.Values.grafana.service.port }}
+        {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

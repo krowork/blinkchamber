@@ -1,0 +1,57 @@
+🎉 BlinkChamber ha sido instalado exitosamente!
+
+📋 Servicios disponibles:
+=======================
+
+{{- if .Values.vault.enabled }}
+🔐 Vault (Gestión de secretos):
+   - URL: https://vault.{{ .Values.global.domain }}
+   - Port-forward: kubectl port-forward svc/{{ include "blinkchamber.fullname" . }}-vault 8200:8200 -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.zitadel.enabled }}
+👤 Zitadel (Gestión de identidad):
+   - URL: https://identity.{{ .Values.global.domain }}
+   - Port-forward: kubectl port-forward svc/{{ include "blinkchamber.fullname" . }}-zitadel 8080:8080 -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.mailu.enabled }}
+📧 Mailu (Sistema de correo):
+   - URL: https://mail.{{ .Values.global.domain }}
+   - Port-forward: kubectl port-forward svc/{{ include "blinkchamber.fullname" . }}-mailu 80:80 -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.grafana.enabled }}
+📊 Grafana (Monitoreo):
+   - URL: https://monitoring.{{ .Values.global.domain }}/grafana
+   - Port-forward: kubectl port-forward svc/{{ include "blinkchamber.fullname" . }}-grafana 3000:3000 -n {{ .Release.Namespace }}
+{{- end }}
+
+{{- if .Values.prometheus.enabled }}
+📈 Prometheus (Métricas):
+   - URL: https://monitoring.{{ .Values.global.domain }}/prometheus
+   - Port-forward: kubectl port-forward svc/{{ include "blinkchamber.fullname" . }}-prometheus 9090:9090 -n {{ .Release.Namespace }}
+{{- end }}
+
+🔧 Configuración adicional:
+==========================
+
+1. Configurar DNS local (/etc/hosts):
+   # BlinkChamber Services
+   127.0.0.1 vault.{{ .Values.global.domain }}
+   127.0.0.1 identity.{{ .Values.global.domain }}
+   127.0.0.1 mail.{{ .Values.global.domain }}
+   127.0.0.1 monitoring.{{ .Values.global.domain }}
+
+2. Verificar estado del release:
+   helm status {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+3. Ver logs de componentes:
+   kubectl logs deployment/{{ include "blinkchamber.fullname" . }}-vault -n {{ .Release.Namespace }}
+
+4. Configurar port-forwards automáticamente:
+   ./scripts/blinkchamber-helm.sh port-forward --all
+
+📚 Documentación:
+================
+Para más información, consulta: blinkchamber/README.md

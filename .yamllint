@@ -1,0 +1,42 @@
+extends: default
+
+rules:
+  # Longitud de línea más permisiva para archivos de configuración
+  line-length:
+    max: 120
+    level: warning
+  
+  # Deshabilitar document-start para archivos de configuración
+  document-start: disable
+  
+  # Habilitar trailing-spaces
+  trailing-spaces: enable
+  
+  # Configuración de truthy más permisiva
+  truthy:
+    check-keys: false
+  
+  # Configuración de comentarios
+  comments:
+    min-spaces-from-content: 1
+  
+  # Configuración de indentación
+  indentation:
+    spaces: 2
+    indent-sequences: true
+  
+  # Configuración de espacios en blanco
+  empty-lines:
+    max: 1
+    max-end: 1
+  
+  # Configuración de caracteres especiales
+  trailing-spaces: enable
+  
+  # Configuración de archivos específicos
+  key-duplicates: enable
+  
+  # Configuración de valores booleanos
+  truthy:
+    check-keys: false
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off'] 
