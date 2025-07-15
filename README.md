@@ -7,14 +7,16 @@
 
 ## 📋 Resumen
 
-**blinkchamber v2.2** es un sistema de gestión de identidad y secretos completamente automatizado que utiliza **HashiCorp Vault** como backend central. Despliega una infraestructura segura y escalable en **4 fases secuenciales** para garantizar una inicialización robusta y completamente automatizada. **Incluye un framework de testing robusto v2.2** que resuelve conflictos de puertos y garantiza 100% confiabilidad en tests paralelos.
+**blinkchamber v2.2** es un sistema de gestión de identidad y secretos completamente automatizado y de alta disponibilidad que utiliza **HashiCorp Vault** como backend central. Despliega una infraestructura segura y escalable en **4 fases secuenciales** para garantizar una inicialización robusta y completamente automatizada.
+
+Este proyecto es mantenido y mejorado con la ayuda de un asistente de IA.
 
 ## 🎯 Características Principales
 
 - 🔐 **Vault como Backend Central**: Todos los secretos gestionados automáticamente
 - 🚀 **Bootstrap Automático**: Despliegue en 4 fases sin intervención manual
 - 🛡️ **Seguridad por Defecto**: Políticas, RBAC y network policies automáticas
-- 🔄 **Auto-unseal**: Soporte para producción (AWS KMS, Azure Key Vault)
+- 🔄 **Alta Disponibilidad**: Vault, PostgreSQL, y Zitadel configurados para alta disponibilidad.
 - 🏗️ **Infraestructura como Código**: Terraform modular y reutilizable
 - 📊 **Monitoreo Integrado**: Grafana y métricas configuradas automáticamente
 - 🧪 **Testing Robusto v2.2**: Framework con asignación dinámica de puertos y aislamiento total
