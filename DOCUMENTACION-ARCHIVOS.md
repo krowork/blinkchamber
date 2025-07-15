@@ -90,7 +90,10 @@ Plantillas de recursos de Kubernetes para cada componente:
 - **`prometheus-deployment.yaml`**: Despliegue de Prometheus, con integración de Vault Agent Sidecar para inyectar secretos.
 - **`grafana-deployment.yaml`**: Despliegue de Grafana, con Vault Agent para credenciales seguras.
 - **`mailu-deployment.yaml`**: Despliegue de Mailu, con inyección de secretos desde Vault.
-- **`zitadel-deployment.yaml`**: Despliegue de Zitadel, gestión de identidad, con integración de Vault para claves y credenciales.
+- **`zitadel-deployment.yaml`**: Despliegue de **Zitadel**, el componente central para la gestión de identidad y acceso (IAM).
+  - **Propósito**: Define el `Deployment` de Zitadel, que incluye el contenedor principal de la aplicación y un `ConfigMap` para su configuración.
+  - **Integración con Vault**: Utiliza un **Vault Agent Sidecar** para inyectar de forma segura la configuración y las credenciales de la base de datos (PostgreSQL) desde Vault.
+  - **Seguridad**: Se ejecuta con un `ServiceAccount` específico (`zitadel-sa`) y está configurado para no exponer secretos directamente en el `Deployment`.
 - **`vault-init-job.yaml`**: Job de inicialización automática de Vault, que:
   - Espera a que Vault esté listo
   - Inicializa y desella Vault
