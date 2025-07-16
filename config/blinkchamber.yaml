@@ -86,7 +86,8 @@ network:
 domains:
   base: "blinkchamber.local"
   vault: "vault.blinkchamber.local"
-  grafana: "grafana.blinkchamber.local"
+  grafana: "monitoring.blinkchamber.local"
+  prometheus: "monitoring.blinkchamber.local"
   zitadel: "zitadel.blinkchamber.local"
   minio: "minio.blinkchamber.local"
   mailu: "mailu.blinkchamber.local"
@@ -171,8 +172,8 @@ vault:
   tls_enabled: false
   storage_size: "10Gi"
   high_availability:
-    enabled: false
-    replicas: 1
+    enabled: true
+    replicas: 3
 
   # Configuración de bootstrap automático
   bootstrap:
@@ -316,6 +317,13 @@ database:
     annotations:
       vault.hashicorp.com/agent-inject: "true"
       vault.hashicorp.com/role: "database-role"
+      vault.hashicorp.com/agent-inject-secret-postgres: "secret/data/database/postgres"
+      vault.hashicorp.com/agent-inject-template-postgres: |
+        {{- with secret "secret/data/database/postgres" -}}
+        export POSTGRES_USER="{{ .Data.data.username }}"
+        export POSTGRES_PASSWORD="{{ .Data.data.password }}"
+        export POSTGRES_DB="{{ .Data.data.database }}"
+        {{- end }}
 
   resources:
     requests:
@@ -324,6 +332,31 @@ database:
     limits:
       cpu: "1000m"
       memory: "1Gi"
+
+  # Configuration for PostgreSQL
+  postgresql:
+    auth:
+      postgresPassword: "postgres123"
+      database: "zitadel"
+      username: "postgres"
+      password: "postgres123"
+    primary:
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+      persistence:
+        enabled: true
+        size: "10Gi"
+        storageClass: "standard"
+      service:
+        type: "ClusterIP"
+        port: 5432
+    ingress:
+      enabled: false
 
 storage:
   chart_version: "5.0.14"
@@ -381,28 +414,29 @@ identity:
     enabled: true
     service_account: "zitadel"
     vault_role: "identity-role"
-    vault_secrets:
-      - name: "zitadel-app"
-        path: "secret/data/identity/zitadel"
-        template: |
-          ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME={{ .Data.data.admin_username }}
-          ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD={{ .Data.data.admin_password }}
-          ZITADEL_EXTERNALSECURE=false
-          ZITADEL_EXTERNALDOMAIN=zitadel.blinkchamber.local
-          ZITADEL_EXTERNALPORT=80
-          ZITADEL_MASTERKEY={{ .Data.data.masterkey }}
-      - name: "zitadel-db"
-        path: "secret/data/database/zitadel"
-        template: |
-          ZITADEL_DATABASE_POSTGRES_HOST={{ .Data.data.host }}
-          ZITADEL_DATABASE_POSTGRES_PORT={{ .Data.data.port }}
-          ZITADEL_DATABASE_POSTGRES_DATABASE={{ .Data.data.database }}
-          ZITADEL_DATABASE_POSTGRES_USER_USERNAME={{ .Data.data.username }}
-          ZITADEL_DATABASE_POSTGRES_USER_PASSWORD={{ .Data.data.password }}
-          ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable
     annotations:
       vault.hashicorp.com/agent-inject: "true"
       vault.hashicorp.com/role: "identity-role"
+      vault.hashicorp.com/agent-inject-secret-zitadel-app: "secret/data/identity/zitadel"
+      vault.hashicorp.com/agent-inject-template-zitadel-app: |
+        {{- with secret "secret/data/identity/zitadel" -}}
+        export ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME="{{ .Data.data.admin_username }}"
+        export ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD="{{ .Data.data.admin_password }}"
+        export ZITADEL_EXTERNALSECURE="false"
+        export ZITADEL_EXTERNALDOMAIN="zitadel.blinkchamber.local"
+        export ZITADEL_EXTERNALPORT="80"
+        export ZITADEL_MASTERKEY="{{ .Data.data.masterkey }}"
+        {{- end }}
+      vault.hashicorp.com/agent-inject-secret-zitadel-db: "secret/data/database/zitadel"
+      vault.hashicorp.com/agent-inject-template-zitadel-db: |
+        {{- with secret "secret/data/database/zitadel" -}}
+        export ZITADEL_DATABASE_POSTGRES_HOST="{{ .Data.data.host }}"
+        export ZITADEL_DATABASE_POSTGRES_PORT="{{ .Data.data.port }}"
+        export ZITADEL_DATABASE_POSTGRES_DATABASE="{{ .Data.data.database }}"
+        export ZITADEL_DATABASE_POSTGRES_USER_USERNAME="{{ .Data.data.username }}"
+        export ZITADEL_DATABASE_POSTGRES_USER_PASSWORD="{{ .Data.data.password }}"
+        export ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE="disable"
+        {{- end }}
 
   resources:
     requests:
@@ -411,6 +445,47 @@ identity:
     limits:
       cpu: "1000m"
       memory: "1Gi"
+
+  # Configuration for Zitadel
+  zitadel_config:
+    config:
+      masterkey: "masterkey123"
+      admin:
+        username: "admin"
+        password: "admin123"
+      database:
+        postgres:
+          host: "blinkchamber-postgresql"
+          port: 5432
+          database: "zitadel"
+          username: "postgres"
+          password: "postgres123"
+          sslMode: "disable"
+      smtp:
+        host: "blinkchamber-mailu"
+        port: 587
+        user: "admin@blinkchamber.local"
+        password: "admin123"
+        fromAddress: "noreply@blinkchamber.local"
+        tls: true
+        startTLS: true
+      externalSecure: false
+      tls:
+        enabled: false
+    service:
+      type: "ClusterIP"
+      port: 8080
+    ingress:
+      enabled: true
+      hosts:
+        - host: "identity.blinkchamber.local"
+          paths:
+            - path: "/"
+              pathType: "Prefix"
+      tls:
+        - secretName: "zitadel-tls"
+          hosts:
+            - "identity.blinkchamber.local"
 
 # Configuración del sistema de correo
 mail:

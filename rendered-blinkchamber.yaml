@@ -1,3 +1,24 @@
+✅ Configuración cargada desde /app/config/blinkchamber.yaml
+
+==============================
+🚀 [INICIO] blinkchamber-helm.sh
+==============================
+🔹 Comando solicitado: template
+
+==============================
+📄 [INICIO] Generando templates del chart
+==============================
+🔹 Usando archivo de valores: config/blinkchamber.yaml
+🔹 Comando de template: helm template blinkchamber /app/blinkchamber -n blinkchamber -f config/blinkchamber.yaml
+
+==============================
+🔹 Ejecutando: Generar templates
+🔹 Comando: helm template blinkchamber /app/blinkchamber -n blinkchamber -f config/blinkchamber.yaml
+==============================
+
+--- Ejecutando comando ---
+
+--- Salida completa del comando ---
 ---
 # Source: blinkchamber/charts/vault/templates/server-disruptionbudget.yaml
 # PodDisruptionBudget to prevent degrading the server cluster through
@@ -1826,10 +1847,10 @@ spec:
           resources:
             limits:
               cpu: 1000m
-              memory: 2Gi
+              memory: 1Gi
             requests:
-              cpu: 200m
-              memory: 512Mi
+              cpu: 250m
+              memory: 256Mi
         - name: vault-agent
           image: hashicorp/vault:1.15.2
           args:
@@ -2598,3 +2619,14 @@ spec:
           limits:
             cpu: 500m
             memory: 256Mi
+--- Fin de la salida ---
+
+✅ Comando ejecutado correctamente: Generar templates
+==============================
+
+==============================
+📄 [FIN] Generación de templates
+==============================\n
+==============================
+🚀 [FIN] blinkchamber-helm.sh
+==============================\n

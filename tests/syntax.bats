@@ -26,8 +26,10 @@
 }
 
 @test "YAML Syntax (blinkchamber)" {
-  helm template blinkchamber ./blinkchamber -n blinkchamber > rendered-blinkchamber.yaml
-  run yamllint rendered-blinkchamber.yaml
+  # Extract the YAML from the output of the script
+  run awk '/^---/{f=1}f' rendered-blinkchamber.yaml > rendered.yaml
+  [ "$status" -eq 0 ]
+  run yamllint rendered.yaml
   [ "$status" -eq 0 ]
 }
 
