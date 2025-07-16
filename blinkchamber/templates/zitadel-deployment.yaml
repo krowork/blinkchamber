@@ -9,7 +9,7 @@ metadata:
     {{- include "blinkchamber.labels" . | nindent 4 }}
     app.kubernetes.io/component: zitadel
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       {{- include "blinkchamber.selectorLabels" . | nindent 6 }}
@@ -19,100 +19,57 @@ spec:
       labels:
         {{- include "blinkchamber.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: zitadel
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "identity-role"
+        vault.hashicorp.com/agent-inject-secret-zitadel: "secret/data/identity/zitadel"
+        vault.hashicorp.com/agent-inject-template-zitadel: |
+          {{- with secret "secret/data/identity/zitadel" -}}
+          export ZITADEL_MASTERKEY='{{ .Data.data.masterkey }}'
+          export ZITADEL_ADMIN_USERNAME='{{ .Data.data.admin_username }}'
+          export ZITADEL_ADMIN_PASSWORD='{{ .Data.data.admin_password }}'
+          {{- end }}
+        vault.hashicorp.com/agent-inject-secret-database: "secret/data/database/postgres"
+        vault.hashicorp.com/agent-inject-template-database: |
+          {{- with secret "secret/data/database/postgres" -}}
+          export ZITADEL_DATABASE_POSTGRES_HOST='localhost'
+          export ZITADEL_DATABASE_POSTGRES_PORT='5432'
+          export ZITADEL_DATABASE_POSTGRES_DATABASE='{{ .Data.data.database }}'
+          export ZITADEL_DATABASE_POSTGRES_USER_USERNAME='{{ .Data.data.username }}'
+          export ZITADEL_DATABASE_POSTGRES_USER_PASSWORD='{{ .Data.data.password }}'
+          export ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME='{{ .Data.data.username }}'
+          export ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD='{{ .Data.data.password }}'
+          {{- end }}
+        vault.hashicorp.com/agent-inject-secret-mail: "secret/data/mail/postfix"
+        vault.hashicorp.com/agent-inject-template-mail: |
+          {{- with secret "secret/data/mail/postfix" -}}
+          export ZITADEL_SMTP_HOST='{{ .Data.data.host }}'
+          export ZITADEL_SMTP_PORT='{{ .Data.data.port }}'
+          export ZITADEL_SMTP_USER='{{ .Data.data.user }}'
+          export ZITADEL_SMTP_PASSWORD='{{ .Data.data.password }}'
+          export ZITADEL_SMTP_FROM_ADDRESS='{{ .Data.data.from_address }}'
+          export ZITADEL_SMTP_TLS='false'
+          export ZITADEL_SMTP_STARTTLS='false'
+          {{- end }}
     spec:
       serviceAccountName: {{ include "blinkchamber.fullname" . }}-zitadel-sa
-      initContainers:
-        - name: wait-vault-secrets
-          image: busybox:1.35
-          command:
-            - 'sh'
-            - '-c'
-            - 'while [ ! -f /vault/secrets/zitadel_masterkey ]; do echo "Waiting for Vault secrets..."; sleep 2; done; echo "Vault secrets ready"'
-          volumeMounts:
-            - name: vault-secrets
-              mountPath: /vault/secrets
       containers:
         - name: zitadel
           image: ghcr.io/zitadel/zitadel:v2.42.0
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              source /vault/secrets/zitadel
+              source /vault/secrets/database
+              source /vault/secrets/mail
+              export ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE=disable
+              export ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE=disable
+              export ZITADEL_EXTERNALSECURE=false
+              export ZITADEL_TLS_ENABLED=false
+              /app/zitadel start-from-init --masterkey $ZITADEL_MASTERKEY --tlsMode disabled
           ports:
             - containerPort: {{ .Values.identity.zitadel_config.service.port }}
               name: http
-          env:
-            - name: ZITADEL_MASTERKEY
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: zitadel_masterkey
-            - name: ZITADEL_ADMIN_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: zitadel_admin_username
-            - name: ZITADEL_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: zitadel_admin_password
-            - name: ZITADEL_DATABASE_POSTGRES_HOST
-              value: {{ .Values.identity.zitadel_config.config.database.postgres.host | quote }}
-            - name: ZITADEL_DATABASE_POSTGRES_PORT
-              value: {{ .Values.identity.zitadel_config.config.database.postgres.port | quote }}
-            - name: ZITADEL_DATABASE_POSTGRES_DATABASE
-              value: {{ .Values.identity.zitadel_config.config.database.postgres.database | quote }}
-            - name: ZITADEL_DATABASE_POSTGRES_USER_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: postgres_username
-            - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: postgres_password
-            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: postgres_username
-            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: vault-secrets
-                  key: postgres_password
-            - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
-              value: {{ .Values.identity.zitadel_config.config.database.postgres.sslMode | quote }}
-            - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
-              value: {{ .Values.identity.zitadel_config.config.database.postgres.sslMode | quote }}
-            - name: ZITADEL_SMTP_HOST
-              value: {{ .Values.identity.zitadel_config.config.smtp.host | quote }}
-            - name: ZITADEL_SMTP_PORT
-              value: {{ .Values.identity.zitadel_config.config.smtp.port | quote }}
-            - name: ZITADEL_SMTP_USER
-              value: {{ .Values.identity.zitadel_config.config.smtp.user | quote }}
-            - name: ZITADEL_SMTP_PASSWORD
-              value: {{ .Values.identity.zitadel_config.config.smtp.password | quote }}
-            - name: ZITADEL_SMTP_FROM_ADDRESS
-              value: {{ .Values.identity.zitadel_config.config.smtp.fromAddress | quote }}
-            - name: ZITADEL_SMTP_TLS
-              value: {{ .Values.identity.zitadel_config.config.smtp.tls | quote }}
-            - name: ZITADEL_SMTP_STARTTLS
-              value: {{ .Values.identity.zitadel_config.config.smtp.startTLS | quote }}
-            - name: ZITADEL_EXTERNALSECURE
-              value: {{ .Values.identity.zitadel_config.config.externalSecure | quote }}
-            - name: ZITADEL_TLS_ENABLED
-              value: {{ .Values.identity.zitadel_config.config.tls.enabled | quote }}
-          volumeMounts:
-            - name: vault-secrets
-              mountPath: /vault/secrets
-              readOnly: true
-          command:
-            - "/app/zitadel"
-          args:
-            - "start-from-init"
-            - "--masterkey"
-            - "$(cat /vault/secrets/zitadel_masterkey)"
-            - "--tlsMode"
-            - "disabled"
           livenessProbe:
             httpGet:
               path: /debug/healthz
@@ -126,34 +83,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
           resources:
-            {{- toYaml .Values.identity.resources | nindent 12 }}
-        - name: vault-agent
-          image: hashicorp/vault:1.15.2
-          args:
-            - "agent"
-            - "-config=/vault/config/agent-config.hcl"
-          env:
-            - name: VAULT_ADDR
-              value: "http://{{ include "blinkchamber.fullname" . }}-vault:8200"
-          volumeMounts:
-            - name: vault-secrets
-              mountPath: /vault/secrets
-            - name: vault-agent-config
-              mountPath: /vault/config
-          resources:
-            requests:
-              cpu: 50m
-              memory: 64Mi
-            limits:
-              cpu: 200m
-              memory: 128Mi
-      volumes:
-        - name: vault-secrets
-          emptyDir:
-            medium: Memory
-        - name: vault-agent-config
-          configMap:
-            name: {{ include "blinkchamber.fullname" . }}-zitadel-vault-agent-config
+            {{- toYaml .Values.zitadel.resources | nindent 12 }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -245,36 +175,6 @@ metadata:
     {{- include "blinkchamber.labels" . | nindent 4 }}
     app.kubernetes.io/component: zitadel
 ---
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "blinkchamber.fullname" . }}-zitadel-role
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "blinkchamber.labels" . | nindent 4 }}
-    app.kubernetes.io/component: zitadel
-rules:
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ include "blinkchamber.fullname" . }}-zitadel-rolebinding
-  namespace: {{ .Release.Namespace }}
-  labels:
-    {{- include "blinkchamber.labels" . | nindent 4 }}
-    app.kubernetes.io/component: zitadel
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ include "blinkchamber.fullname" . }}-zitadel-role
-subjects:
-- kind: ServiceAccount
-  name: {{ include "blinkchamber.fullname" . }}-zitadel-sa
-  namespace: {{ .Release.Namespace }}
----
 apiVersion: v1
 kind: Service
 metadata:
@@ -294,7 +194,7 @@ spec:
   type: {{ .Values.identity.zitadel_config.service.type }}
 {{- if .Values.identity.zitadel_config.ingress.enabled }}
 ---
-apiVersion: networking.k8s.io/v1
+apiVersion: networking.k8s.ioio/v1
 kind: Ingress
 metadata:
   name: {{ include "blinkchamber.fullname" . }}-zitadel

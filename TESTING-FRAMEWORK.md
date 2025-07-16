@@ -70,6 +70,7 @@ El framework de testing comprehensivo de blinkchamber v2.2 incluye **mejoras rob
 | `test-phases.sh` | Tests por fases individuales | 3-8 min | ⚠️ Conflictos en paralelo |
 | `test-integration.sh` | Tests de integración end-to-end | 8-15 min | ✅ Estable |
 | `test-vault-bootstrap.sh` | Test básico (legacy) | 5-7 min | ✅ Estable |
+| `ha.bats` | Tests de alta disponibilidad | 5-10 min | ✅ Estable |
 
 ## 📊 Test Matrix
 

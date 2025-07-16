@@ -10,13 +10,15 @@
 
 **blinkchamber v2.2** es una plataforma de identidad federada y gestión de secretos construida sobre **Zitadel y HashiCorp Vault**. El sistema automatiza el despliegue de una infraestructura segura y escalable en **4 fases secuenciales**, garantizando una inicialización robusta y lista para producción. Incluye un **framework de testing robusto v2.2** que resuelve conflictos de puertos y garantiza 100% de confiabilidad en tests paralelos.
 
+Este proyecto es mantenido y mejorado con la ayuda de un asistente de IA.
+
 ## 🎯 Características Principales
 
 - 🔐 **Gestión de Identidad con Zitadel**: Solución de IAM open source lista para producción.
 - 🔑 **Backend de Secretos con Vault**: Almacenamiento seguro y centralizado de credenciales.
 - 🚀 **Bootstrap 100% Automatizado**: Despliegue completo en 4 fases sin intervención manual.
 - 🛡️ **Seguridad por Defecto**: Políticas, RBAC y network policies automáticas.
-- 🔄 **Auto-unseal para Vault**: Soporte para producción (AWS KMS, Azure Key Vault).
+- 🔄 **Alta Disponibilidad**: Vault, PostgreSQL, y Zitadel configurados para alta disponibilidad.
 - 🏗️ **Infraestructura como Código**: Terraform modular y reutilizable.
 - 📊 **Monitoreo Integrado**: Grafana y métricas configuradas automáticamente.
 - 🧪 **Testing Robusto v2.2**: Framework con asignación dinámica de puertos y aislamiento total.

@@ -137,6 +137,13 @@ module "ingress" {
   depends_on = [module.kubernetes_base]
 }
 
+# Módulo de Consul
+module "consul" {
+  source = "../../modules/consul"
+
+  depends_on = [module.kubernetes_base]
+}
+
 # Módulo de cert-manager
 module "cert_manager" {
   source = "../../modules/cert-manager"
@@ -216,6 +223,13 @@ module "vault_bootstrap" {
   }
 
   depends_on = [module.cert_manager]
+}
+
+# Módulo de Rook/Ceph
+module "rook_ceph" {
+  source = "../../modules/rook-ceph"
+
+  depends_on = [module.kubernetes_base]
 }
 
 # Outputs de la fase 1

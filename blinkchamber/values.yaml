@@ -43,9 +43,9 @@ vault:
       enabled: true
       replicas: 3
     dev:
-      enabled: false
+      enabled: true # Enable dev mode for local development
     standalone:
-      enabled: false
+      enabled: true
     config: |
       ui = true
 
@@ -56,12 +56,8 @@ vault:
       }
 
       storage "consul" {
-        address = "consul-server.blinkchamber.svc:8500"
+        address = "consul-server.consul.svc:8500"
         path    = "vault/"
-      }
-
-      service_registration "consul" {
-        address = "consul-server.blinkchamber.svc:8500"
       }
       disable_mlock = true
 
@@ -100,10 +96,11 @@ postgresql:
 
   # Configuración de la base de datos
   auth:
-    postgresPassword: "postgres123"
+    # Las credenciales se obtienen de Vault
+    postgresPassword: ""
     database: "zitadel"
     username: "postgres"
-    password: "postgres123"
+    password: ""
 
   # Configuración de recursos
   primary:
@@ -136,10 +133,11 @@ zitadel:
 
   # Configuración de la aplicación
   config:
-    masterkey: "masterkey123"
+    # Las credenciales se obtienen de Vault
+    masterkey: ""
     admin:
       username: "admin"
-      password: "admin123"
+      password: ""
 
     # Configuración de base de datos
     database:
@@ -148,7 +146,7 @@ zitadel:
         port: 5432
         database: "zitadel"
         username: "postgres"
-        password: "postgres123"
+        password: "" # Se obtiene de Vault
         sslMode: "disable"
 
     # Configuración de correo
@@ -156,7 +154,7 @@ zitadel:
       host: "blinkchamber-mailu"
       port: 587
       user: "admin@blinkchamber.local"
-      password: "admin123"
+      password: "" # Se obtiene de Vault
       fromAddress: "noreply@blinkchamber.local"
       tls: true
       startTLS: true
@@ -287,7 +285,7 @@ grafana:
   enabled: true
 
   # Configuración de la aplicación
-  adminPassword: "grafana123"
+  adminPassword: "" # Se obtiene de Vault
 
   # Configuración de recursos
   resources:

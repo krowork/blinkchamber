@@ -28,15 +28,15 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           FASE 1: Bootstrap Básico                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  kubernetes-base → ingress-nginx → cert-manager → vault-infrastructure      │
-│  (Cluster K8s)    (Ingress)        (TLS Auto)    (Vault Pods)               │
+│  kubernetes-base → ingress-nginx → cert-manager → rook-ceph → consul        │
+│  (Cluster K8s)    (Ingress)        (TLS Auto)      (Storage)     (Service Mesh)│
 └─────────────────────────────────────────────────────────────────────────────┘
                                         ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                        FASE 2: Inicialización Vault                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  vault-init → kubernetes-auth → policies → auto-unseal                      │
-│  (Auto Init)    (K8s Auth)        (RBAC)      (AWS KMS/Transit)            │
+│  (Auto Init)    (K8s Auth)        (RBAC)      (HA Consul)                  │
 └─────────────────────────────────────────────────────────────────────────────┘
                                         ↓
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -49,8 +49,8 @@
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                     FASE 4: Aplicaciones con Vault                          │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│  database → identity → storage → monitoring (todos con Vault)               │
-│  (PostgreSQL)   (Zitadel)   (MinIO)    (Grafana/Prometheus)                │
+│  database (HA) → identity (HA) → storage → monitoring (todos con Vault)     │
+│  (PostgreSQL)    (Zitadel)      (MinIO)    (Grafana/Prometheus)             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -60,15 +60,16 @@
 - **Kubernetes Cluster**: Orquestación de contenedores
 - **Nginx Ingress**: Gestión de tráfico HTTP/HTTPS
 - **Cert Manager**: Certificados TLS automáticos
-- **Persistent Storage**: Volúmenes persistentes para datos
+- **Rook/Ceph**: Almacenamiento distribuido para persistencia HA.
+- **Consul**: Malla de servicios para el backend de alta disponibilidad de Vault.
 - **Mailu**: Sistema de correo electrónico autocontenido
 
 #### 🔐 **Gestión de Secretos Profesional**
-- **HashiCorp Vault**: Backend central de secretos
+- **HashiCorp Vault (HA)**: Backend central de secretos en modo de alta disponibilidad.
 - **Vault Agent Sidecar**: Inyección dinámica de secretos en cada pod
 - **KV Secret Engine v2**: Almacenamiento de secretos
 - **Kubernetes Auth**: Autenticación nativa de K8s con ServiceAccounts
-- **Auto-unseal**: Desbloqueo automático (AWS KMS/Transit)
+- **Auto-unseal**: Desbloqueo automático con Consul.
 - **Principio de Mínimo Privilegio**: Políticas granulares por aplicación
 - **Secretos Dinámicos**: Sin almacenamiento estático en Kubernetes
 - **Auditoría Completa**: Logs de acceso a secretos en tiempo real
@@ -151,53 +152,6 @@
 - **Licenciamiento**: Componentes open-source
 - **ROI Rápido**: Valor inmediato tras el despliegue
 
-## ⚠️ Inconvenientes y Limitaciones
-
-### ❌ **Desventajas Técnicas**
-
-#### 🏗️ **Complejidad Arquitectural**
-- **Curva de Aprendizaje**: Requiere conocimiento de múltiples tecnologías (incluyendo gestión de correo Mailu)
-- **Dependencias Múltiples**: Muchos componentes interdependientes
-- **Configuración Compleja**: Múltiples archivos de configuración
-- **Debugging Complejo**: Troubleshooting en sistemas distribuidos
-- **Overhead Operacional**: Más componentes que mantener
-
-#### 🔐 **Consideraciones de Seguridad**
-- **Vault como SPOF**: Vault es punto único de fallo
-- **Gestión de Claves**: Complejidad en gestión de claves de auto-unseal
-- **Permisos Granulares**: Configuración compleja de políticas
-- **Auditoría Requerida**: Necesidad de revisar logs regularmente
-- **Compliance**: Requiere validación para entornos regulados
-
-#### 📊 **Rendimiento**
-- **Latencia de Secretos**: Overhead en acceso a secretos
-- **Recursos de Memoria**: Alto consumo de memoria en desarrollo (Mailu puede incrementar el uso en entornos pequeños)
-- **Tiempo de Arranque**: Despliegue inicial puede ser lento
-- **Network Overhead**: Comunicación entre múltiples servicios
-- **Storage Requirements**: Requisitos de almacenamiento significativos
-
-### ❌ **Desventajas Operacionales**
-
-#### 🎯 **Requisitos de Infraestructura**
-- **Recursos Mínimos**: Requiere recursos significativos
-- **Dependencias Externas**: Requiere acceso a repositorios externos
-- **Conectividad**: Necesita acceso a internet para descargas
-- **Permisos**: Requiere permisos elevados en el sistema
-- **Compatibilidad**: Limitaciones de versiones de componentes
-
-#### 🔧 **Mantenimiento**
-- **Actualizaciones**: Necesidad de mantener múltiples componentes
-- **Compatibilidad**: Gestión de versiones entre componentes
-- **Backup Strategy**: Estrategia compleja de backup
-- **Monitoring**: Necesidad de monitorear múltiples servicios
-- **Documentation**: Mantenimiento de documentación extensa
-
-#### 💰 **Consideraciones de Costos**
-- **Recursos de Desarrollo**: Requiere recursos significativos para desarrollo (Mailu añade overhead si se usa en entornos pequeños)
-- **Licenciamiento**: Algunos componentes pueden requerir licencias
-- **Training**: Necesidad de entrenamiento del equipo
-- **Support**: Posible necesidad de soporte externo
-- **Infrastructure**: Costos de infraestructura adicional
 
 ## 🔧 Componentes Detallados
 
