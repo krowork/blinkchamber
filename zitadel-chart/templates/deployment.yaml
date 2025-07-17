@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zitadel-chart.fullname" . }}
+  labels:
+    {{- include "zitadel-chart.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "zitadel-chart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "zitadel-chart.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: ZITADEL_MASTERKEY_SECRET_NAME
+              value: {{ .Values.zitadel.masterkeySecretName }}
+            - name: ZITADEL_DATABASE_HOST
+              value: {{ .Values.zitadel.database.host }}
+            - name: ZITADEL_DATABASE_PORT
+              value: {{ .Values.zitadel.database.port | quote }}
+            - name: ZITADEL_DATABASE_USER
+              value: {{ .Values.zitadel.database.user }}
+            - name: ZITADEL_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.zitadel.database.passwordSecret.name }}
+                  key: {{ .Values.zitadel.database.passwordSecret.key }}
+          volumeMounts:
+            - name: zitadel-masterkey
+              mountPath: "/etc/zitadel/masterkey"
+              readOnly: true
+      volumes:
+        - name: zitadel-masterkey
+          secret:
+            secretName: {{ .Values.zitadel.masterkeySecretName }}

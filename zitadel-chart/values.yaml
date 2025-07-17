@@ -1,0 +1,35 @@
+replicaCount: 2
+
+image:
+  repository: ghcr.io/zitadel/zitadel
+  pullPolicy: IfNotPresent
+  tag: "stable"
+
+zitadel:
+  masterkeySecretName: "zitadel-masterkey"
+  database:
+    host: "zitadel-postgresql"
+    port: 5432
+    user: "zitadel"
+    passwordSecret:
+      name: "zitadel-db-password"
+      key: "password"
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: zitadel.example.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls:
+   - secretName: zitadel-tls
+     hosts:
+       - zitadel.example.com
