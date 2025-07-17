@@ -31,6 +31,15 @@ Para ejecutar las pruebas de BATS, ejecute el siguiente comando:
 bats tests/test_architecture.bats
 ```
 
+Las pruebas verificarán lo siguiente:
+
+*   Que los despliegues de ZITADEL y Vault tengan el número correcto de réplicas.
+*   Que todos los pods de ZITADEL y Vault estén en estado "Running".
+*   Que los servicios de ZITADEL y Vault sean accesibles.
+*   Que no haya errores en los logs de los pods de ZITADEL y Vault.
+*   Que ZITADEL y Vault sigan estando disponibles después de un fallo de un nodo.
+*   Que ZITADEL siga estando disponible después de un fallo de la base de datos.
+
 ## Documentación
 
 Para obtener una descripción detallada de la arquitectura, consulte el archivo `arquitectura_ha_zitadel_vault.md`.
