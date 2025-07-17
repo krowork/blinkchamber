@@ -11,6 +11,19 @@ spec:
       {{- include "zitadel-chart.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "zitadel"
+        vault.hashicorp.com/agent-inject-secret-masterkey: "secret/data/zitadel/masterkey"
+        vault.hashicorp.com/agent-inject-template-masterkey: |
+          {{- with secret "secret/data/zitadel/masterkey" -}}
+          {{ .Data.data.masterkey }}
+          {{- end }}
+        vault.hashicorp.com/agent-inject-secret-db-password: "secret/data/zitadel/db-password"
+        vault.hashicorp.com/agent-inject-template-db-password: |
+          {{- with secret "secret/data/zitadel/db-password" -}}
+          {{ .Data.data.password }}
+          {{- end }}
       labels:
         {{- include "zitadel-chart.selectorLabels" . | nindent 8 }}
     spec:
@@ -23,8 +36,8 @@ spec:
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           env:
-            - name: ZITADEL_MASTERKEY_SECRET_NAME
-              value: {{ .Values.zitadel.masterkeySecretName }}
+            - name: ZITADEL_MASTERKEY_PATH
+              value: /vault/secrets/masterkey
             - name: ZITADEL_DATABASE_HOST
               value: {{ .Values.zitadel.database.host }}
             - name: ZITADEL_DATABASE_PORT
@@ -32,15 +45,4 @@ spec:
             - name: ZITADEL_DATABASE_USER
               value: {{ .Values.zitadel.database.user }}
             - name: ZITADEL_DATABASE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.zitadel.database.passwordSecret.name }}
-                  key: {{ .Values.zitadel.database.passwordSecret.key }}
-          volumeMounts:
-            - name: zitadel-masterkey
-              mountPath: "/etc/zitadel/masterkey"
-              readOnly: true
-      volumes:
-        - name: zitadel-masterkey
-          secret:
-            secretName: {{ .Values.zitadel.masterkeySecretName }}
+              valueFromFile: /vault/secrets/db-password

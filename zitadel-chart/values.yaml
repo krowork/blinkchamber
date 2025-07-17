@@ -6,14 +6,13 @@ image:
   tag: "stable"
 
 zitadel:
-  masterkeySecretName: "zitadel-masterkey"
   database:
     host: "zitadel-postgresql"
     port: 5432
     user: "zitadel"
-    passwordSecret:
-      name: "zitadel-db-password"
-      key: "password"
+
+vault:
+  address: "http://vault:8200"
 
 service:
   type: ClusterIP
