@@ -6,6 +6,7 @@ image:
   tag: "stable"
 
 zitadel:
+  masterkeySecretName: "zitadel-masterkey"
   database:
     host: "zitadel-postgresql"
     port: 5432

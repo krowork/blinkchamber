@@ -38,6 +38,11 @@ spec:
           env:
             - name: ZITADEL_MASTERKEY_PATH
               value: /vault/secrets/masterkey
+          - name: ZITADEL_MASTERKEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.zitadel.masterkeySecretName }}
+                key: masterkey
             - name: ZITADEL_DATABASE_HOST
               value: {{ .Values.zitadel.database.host }}
             - name: ZITADEL_DATABASE_PORT
