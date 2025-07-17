@@ -24,6 +24,7 @@ spec:
           {{- with secret "secret/data/zitadel/db-password" -}}
           {{ .Data.data.password }}
           {{- end }}
+        vault.hashicorp.com/agent-run-as-user: "1000"
       labels:
         {{- include "zitadel-chart.selectorLabels" . | nindent 8 }}
     spec:
@@ -38,16 +39,17 @@ spec:
           env:
             - name: ZITADEL_MASTERKEY_PATH
               value: /vault/secrets/masterkey
-          - name: ZITADEL_MASTERKEY
-            valueFrom:
-              secretKeyRef:
-                name: {{ .Values.zitadel.masterkeySecretName }}
-                key: masterkey
             - name: ZITADEL_DATABASE_HOST
               value: {{ .Values.zitadel.database.host }}
             - name: ZITADEL_DATABASE_PORT
               value: {{ .Values.zitadel.database.port | quote }}
             - name: ZITADEL_DATABASE_USER
               value: {{ .Values.zitadel.database.user }}
-            - name: ZITADEL_DATABASE_PASSWORD
-              valueFromFile: /vault/secrets/db-password
+            - name: ZITADEL_DATABASE_PASSWORD_PATH
+              value: /vault/secrets/db-password
+          volumeMounts:
+            - name: vault-secrets
+              mountPath: /vault/secrets
+      volumes:
+        - name: vault-secrets
+          emptyDir: {}

@@ -1,0 +1,84 @@
+{{- if .Values.injector.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vault-chart.fullname" . }}-injector
+  labels:
+    app.kubernetes.io/name: vault-injector
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: vault-injector
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vault-injector
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ include "vault-chart.serviceAccountName" . }}-injector
+      containers:
+        - name: vault-injector
+          image: "{{ .Values.injector.image.repository }}:{{ .Values.injector.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          args:
+            - "agent-injector"
+          env:
+            - name: VAULT_ADDR
+              value: {{ .Values.vault.api_addr }}
+          resources:
+            {{- toYaml .Values.injector.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "vault-chart.serviceAccountName" . }}-injector
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vault-injector-role
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vault-injector-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vault-injector-role
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "vault-chart.serviceAccountName" . }}-injector
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: vault-injector-webhook
+webhooks:
+  - name: vault.hashicorp.com
+    clientConfig:
+      service:
+        name: {{ include "vault-chart.fullname" . }}-injector
+        namespace: {{ .Release.Namespace }}
+        path: "/mutate"
+      caBundle: ""
+    rules:
+      - operations: [ "CREATE", "UPDATE" ]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    failurePolicy: Fail
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+{{- end }}

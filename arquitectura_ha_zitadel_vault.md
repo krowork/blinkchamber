@@ -56,6 +56,21 @@ La configuración de Vault debe incluir:
 
 El despliegue de la arquitectura se puede automatizar utilizando herramientas como Terraform y Ansible.
 
+#### Inyección de Secretos con Vault
+
+Para gestionar los secretos de forma segura, utilizamos el inyector de secretos de Vault. Este componente se ejecuta en Kubernetes y utiliza un sidecar para inyectar secretos directamente en los pods de las aplicaciones.
+
+##### Flujo de trabajo
+
+1.  **Habilitar el inyector de Vault**: El chart de Helm de Vault (`vault-chart`) ha sido modificado para incluir y habilitar el inyector de secretos.
+2.  **Anotaciones en Zitadel**: El `deployment.yaml` de Zitadel (`zitadel-chart`) ha sido anotado para que el inyector de Vault sepa que debe actuar sobre él. Las anotaciones especifican el rol de Vault a utilizar y los secretos a inyectar.
+3.  **Montaje de volumen**: Un volumen `emptyDir` se monta en el pod de Zitadel en `/vault/secrets`. El sidecar de Vault escribe los secretos en este volumen.
+4.  **Consumo de secretos**: Zitadel ha sido configurado para leer los secretos desde los ficheros en `/vault/secrets` en lugar de variables de entorno o secretos de Kubernetes.
+
+##### Despliegue
+
+Para desplegar la solución completa, sigue los pasos del `README.md` de Terraform. El inyector de Vault y las anotaciones de Zitadel se configurarán automáticamente.
+
 ### 5.2. Monitorización
 
 Es esencial monitorizar la salud y el rendimiento de todos los componentes de la arquitectura. Se recomienda utilizar Prometheus para la recopilación de métricas y Grafana para la visualización.

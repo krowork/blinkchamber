@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
 
 # Cargar helpers de prueba
-load 'helpers/bats-helpers/load'
+load '/app/tests/helpers/bats-helpers/load'
 
 # Variables
 ZITADEL_RELEASE_NAME="zitadel"
