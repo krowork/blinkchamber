@@ -65,8 +65,19 @@ Cuando todos los nodos estén desellados, el clúster estará listo para usarse.
 
 ### 3. Desplegar ZITADEL
 
+1. Agrega el repositorio oficial de ZITADEL:
+
     ```bash
-    helm install zitadel ./zitadel-chart --namespace identity --create-namespace
+    helm repo add zitadel https://charts.zitadel.com
+    helm repo update
+    ```
+
+2. Crea un archivo `zitadel-values.yaml` adaptado a tu entorno (ver ejemplo en la documentación oficial o en este repositorio).
+
+3. Despliega ZITADEL en modo HA:
+
+    ```bash
+    helm upgrade --install zitadel zitadel/zitadel --namespace identity --create-namespace -f zitadel-values.yaml
     ```
 
 ## Habilitar TLS para Producción
@@ -112,12 +123,35 @@ Cuando todos los nodos estén desellados, el clúster estará listo para usarse.
     helm upgrade vault hashicorp/vault -n blinkchamber -f vault-values.yaml
     ```
 
+## Despliegue Automatizado con Script
+
+Para facilitar el despliegue de Vault y ZITADEL, este repositorio incluye el script `deploy.sh` que orquesta todas las etapas necesarias:
+
+```bash
+./deploy.sh
+```
+
+El script permite ejecutar las siguientes etapas de forma interactiva:
+
+1. Desplegar Vault (chart oficial, modo HA)
+2. Inicializar y desellar Vault
+3. Crear secret TLS para Vault
+4. Desplegar ZITADEL (chart oficial, modo HA)
+5. Crear secrets necesarios para ZITADEL (base de datos, token de Vault, TLS)
+6. Desplegar infraestructura base (Terraform)
+7. Desplegar PostgreSQL HA (Bitnami + Vault Injector)
+
+**Notas:**
+- Antes de crear los secrets, asegúrate de tener a mano las contraseñas y certificados necesarios.
+- Puedes ejecutar cada etapa de forma independiente según el estado de tu clúster.
+- Personaliza los archivos `vault-values.yaml`, `zitadel-values.yaml` y `postgresql-ha-values.yaml` según tu entorno.
+
 ## Pruebas
 
 Para ejecutar las pruebas de BATS, ejecute el siguiente comando:
 
 ```bash
-bats tests/test_architecture.bats
+bats tests/test_exhaustive.bats
 ```
 
 Las pruebas verificarán lo siguiente:

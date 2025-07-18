@@ -1,0 +1,50 @@
+replicaCount: 2
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: true
+  hosts:
+    - host: zitadel.tu-dominio.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+config:
+  database:
+    postgres:
+      host: postgres.tu-dominio.com
+      port: 5432
+      database: zitadel
+      user: zitadel
+      password:
+        existingSecret: zitadel-db-secret
+        existingSecretKey: password
+  secrets:
+    vault:
+      enabled: true
+      address: "https://vault.blinkchamber.svc:8200"
+      token:
+        existingSecret: zitadel-vault-token
+        existingSecretKey: token
+  externalDomain: zitadel.tu-dominio.com
+  tls:
+    enabled: true
+    secretName: zitadel-tls
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 2Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80 

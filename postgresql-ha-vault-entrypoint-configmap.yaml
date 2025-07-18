@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgresql-ha-vault-entrypoint
+  namespace: database # Cambia si usas otro namespace
+  labels:
+    app: postgresql-ha
+    vault-injector: enabled
+
+data:
+  postgresql-ha-vault-entrypoint.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    export POSTGRES_PASSWORD="$(cat /vault/secrets/POSTGRES_PASSWORD)"
+    exec /opt/bitnami/scripts/postgresql/entrypoint.sh /opt/bitnami/scripts/postgresql/run.sh 
