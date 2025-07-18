@@ -16,14 +16,10 @@ spec:
         vault.hashicorp.com/role: "zitadel"
         vault.hashicorp.com/agent-inject-secret-masterkey: "secret/data/zitadel/masterkey"
         vault.hashicorp.com/agent-inject-template-masterkey: |
-          {{- with secret "secret/data/zitadel/masterkey" -}}
-          {{ .Data.data.masterkey }}
-          {{- end }}
+          {{`{{- with secret \"secret/data/zitadel/masterkey\" -}}\n{{ .Data.data.masterkey }}\n{{- end }}`}}
         vault.hashicorp.com/agent-inject-secret-db-password: "secret/data/zitadel/db-password"
         vault.hashicorp.com/agent-inject-template-db-password: |
-          {{- with secret "secret/data/zitadel/db-password" -}}
-          {{ .Data.data.password }}
-          {{- end }}
+          {{`{{- with secret \"secret/data/zitadel/db-password\" -}}\n{{ .Data.data.password }}\n{{- end }}`}}
         vault.hashicorp.com/agent-run-as-user: "1000"
       labels:
         {{- include "zitadel-chart.selectorLabels" . | nindent 8 }}
@@ -47,9 +43,3 @@ spec:
               value: {{ .Values.zitadel.database.user }}
             - name: ZITADEL_DATABASE_PASSWORD_PATH
               value: /vault/secrets/db-password
-          volumeMounts:
-            - name: vault-secrets
-              mountPath: /vault/secrets
-      volumes:
-        - name: vault-secrets
-          emptyDir: {}

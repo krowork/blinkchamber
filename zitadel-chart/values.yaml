@@ -22,6 +22,19 @@ service:
   type: ClusterIP
   port: 8080
 
+serviceAccount:
+  create: true
+  name: ""
+  automount: true
+  annotations: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
 ingress:
   enabled: true
   className: "nginx"
