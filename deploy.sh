@@ -1,13 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Variables
+# =====================
+# VARIABLES PRINCIPALES
+# =====================
 VAULT_NAMESPACE="blinkchamber"
 ZITADEL_NAMESPACE="identity"
+POSTGRES_NAMESPACE="database"
 VAULT_VALUES="vault-values.yaml"
 ZITADEL_VALUES="zitadel-values.yaml"
+POSTGRES_VALUES="postgresql-ha-values.yaml"
 
-# 1. Despliegue de Vault (chart oficial)
+# Rutas parametrizables (ajusta según tu entorno)
+VAULT_TLS_CERT="/ruta/a/tu/certificado.crt"
+VAULT_TLS_KEY="/ruta/a/tu/clave.key"
+ZITADEL_TLS_CERT="/ruta/a/tls.crt"
+ZITADEL_TLS_KEY="/ruta/a/tls.key"
+
+# =====================
+# FUNCIONES DE AYUDA
+# =====================
+show_help() {
+  echo "\nOpciones de despliegue recomendadas:"
+  echo "  1) Desplegar infraestructura base (Terraform: namespaces, cert-manager, nginx-ingress)"
+  echo "  2) Crear secret TLS para Vault"
+  echo "  3) Desplegar Vault"
+  echo "  4) Inicializar y desellar Vault"
+  echo "  5) Desplegar PostgreSQL HA (Bitnami + Vault Injector)"
+  echo "  6) Desplegar ZITADEL (con Vault Injector)"
+  echo "  h) Mostrar ayuda"
+  echo "  0) Salir"
+}
+
+# =====================
+# VAULT
+# =====================
 deploy_vault() {
   echo "[Vault] Agregando repositorio de Helm y actualizando..."
   helm repo add hashicorp https://helm.releases.hashicorp.com || true
@@ -22,13 +49,22 @@ deploy_vault() {
     -f "$VAULT_VALUES"
 }
 
-# 2. Inicialización y desellado de Vault
 init_unseal_vault() {
   echo "[Vault] Inicializando y desellando Vault..."
   bash terraform/vault-init.sh "$VAULT_NAMESPACE"
 }
 
-# 3. Despliegue de ZITADEL (chart oficial)
+create_vault_tls_secret() {
+  echo "[Vault] Creando secret TLS para Vault..."
+  kubectl create secret generic vault-tls \
+    --from-file=tls.crt="$VAULT_TLS_CERT" \
+    --from-file=tls.key="$VAULT_TLS_KEY" \
+    -n "$VAULT_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+}
+
+# =====================
+# ZITADEL
+# =====================
 deploy_zitadel() {
   echo "[ZITADEL] Agregando repositorio de Helm y actualizando..."
   helm repo add zitadel https://charts.zitadel.com || true
@@ -37,85 +73,57 @@ deploy_zitadel() {
   echo "[ZITADEL] Creando namespace si no existe..."
   kubectl get ns "$ZITADEL_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$ZITADEL_NAMESPACE"
 
-  echo "[ZITADEL] Desplegando ZITADEL en modo HA..."
+  echo "[ZITADEL] Desplegando ZITADEL (con Vault Injector)..."
   helm upgrade --install zitadel zitadel/zitadel \
     -n "$ZITADEL_NAMESPACE" --create-namespace \
     -f "$ZITADEL_VALUES"
 }
 
-# 4. Crear secrets necesarios para ZITADEL (ejemplo)
-create_zitadel_secrets() {
-  echo "[ZITADEL] Creando secrets necesarios (ajusta según tu entorno)..."
-  # Secret de la base de datos
-  kubectl create secret generic zitadel-db-secret \
-    --from-literal=password="<password_db>" \
-    -n "$ZITADEL_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-
-  # Secret del token de Vault
-  kubectl create secret generic zitadel-vault-token \
-    --from-literal=token="<vault_token>" \
-    -n "$ZITADEL_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-
-  # Secret TLS para ZITADEL
-  kubectl create secret tls zitadel-tls \
-    --cert="</ruta/a/tls.crt>" --key="</ruta/a/tls.key>" \
-    -n "$ZITADEL_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-}
-
-# 5. Crear secret TLS para Vault (ejemplo)
-create_vault_tls_secret() {
-  echo "[Vault] Creando secret TLS para Vault..."
-  kubectl create secret generic vault-tls \
-    --from-file=tls.crt=</ruta/a/tu/certificado.crt> \
-    --from-file=tls.key=</ruta/a/tu/clave.key> \
-    -n "$VAULT_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-}
-
-# 6. Despliegue de PostgreSQL HA (Bitnami + Vault Injector)
+# =====================
+# POSTGRESQL HA
+# =====================
 deploy_postgres_ha() {
   echo "[PostgreSQL HA] Agregando repositorio de Helm y actualizando..."
   helm repo add bitnami https://charts.bitnami.com/bitnami || true
   helm repo update
 
   echo "[PostgreSQL HA] Creando namespace si no existe..."
-  kubectl get ns database >/dev/null 2>&1 || kubectl create ns database
+  kubectl get ns "$POSTGRES_NAMESPACE" >/dev/null 2>&1 || kubectl create ns "$POSTGRES_NAMESPACE"
 
-  echo "[PostgreSQL HA] Desplegando PostgreSQL HA con integración Vault Injector..."
+  echo "[PostgreSQL HA] Desplegando PostgreSQL HA con Vault Injector..."
   helm upgrade --install postgresql-ha bitnami/postgresql-ha \
-    -n database --create-namespace \
-    -f postgresql-ha-values.yaml
+    -n "$POSTGRES_NAMESPACE" --create-namespace \
+    -f "$POSTGRES_VALUES"
 }
 
-# 0. Despliegue de infraestructura base con Terraform
+# =====================
+# INFRAESTRUCTURA BASE
+# =====================
 provision_infra() {
-  echo "[Infra] Desplegando infraestructura base (Kubernetes, red, base de datos) con Terraform..."
-  cd terraform
+  echo "[Infra] Desplegando infraestructura base (namespaces, cert-manager, nginx-ingress) con Terraform..."
+  cd terraform/kind
   terraform init
   terraform apply -auto-approve
-  cd ..
+  cd ../..
 }
 
-# Menú de etapas
-echo "\nOpciones de despliegue disponibles:"
-echo "  1) Desplegar Vault"
-echo "  2) Inicializar y desellar Vault"
-echo "  3) Crear secret TLS para Vault"
-echo "  4) Desplegar ZITADEL"
-echo "  5) Crear secrets para ZITADEL"
-echo "  6) Desplegar infraestructura base (Terraform)"
-echo "  7) Desplegar PostgreSQL HA (Bitnami + Vault Injector)"
-echo "  0) Salir"
-
-read -rp "Selecciona una opción (puedes ejecutar varias en orden): " opcion
-
-case $opcion in
-  1) deploy_vault ;;
-  2) init_unseal_vault ;;
-  3) create_vault_tls_secret ;;
-  4) deploy_zitadel ;;
-  5) create_zitadel_secrets ;;
-  6) provision_infra ;;
-  7) deploy_postgres_ha ;;
-  0) echo "Saliendo..."; exit 0 ;;
-  *) echo "Opción no válida"; exit 1 ;;
-esac 
+# =====================
+# MENÚ INTERACTIVO
+# =====================
+while true; do
+  show_help
+  read -rp $'\nSelecciona una opción (puedes ejecutar varias en orden, separadas por espacio): ' opciones
+  for opcion in $opciones; do
+    case $opcion in
+      1) provision_infra ;;
+      2) create_vault_tls_secret ;;
+      3) deploy_vault ;;
+      4) init_unseal_vault ;;
+      5) deploy_postgres_ha ;;
+      6) deploy_zitadel ;;
+      h|H) show_help ;;
+      0) echo "Saliendo..."; exit 0 ;;
+      *) echo "Opción no válida: $opcion" ;;
+    esac
+  done
+done 

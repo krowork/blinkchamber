@@ -13,6 +13,20 @@ ingress:
           pathType: ImplementationSpecific
   tls: []
 
+podAnnotations:
+  vault.hashicorp.com/agent-inject: "true"
+  vault.hashicorp.com/role: "zitadel-role"
+  vault.hashicorp.com/agent-inject-secret-ZITADEL_DB_PASSWORD: "secret/data/zitadel/postgres#password"
+  vault.hashicorp.com/agent-inject-template-ZITADEL_DB_PASSWORD: |
+    {{- with secret "secret/data/zitadel/postgres" -}}
+    {{ .Data.data.password }}
+    {{- end }}
+  vault.hashicorp.com/agent-inject-secret-VAULT_TOKEN: "secret/data/zitadel/vault#token"
+  vault.hashicorp.com/agent-inject-template-VAULT_TOKEN: |
+    {{- with secret "secret/data/zitadel/vault" -}}
+    {{ .Data.data.token }}
+    {{- end }}
+
 config:
   database:
     postgres:
@@ -21,15 +35,13 @@ config:
       database: zitadel
       user: zitadel
       password:
-        existingSecret: zitadel-db-secret
-        existingSecretKey: password
+        valueFromFile: /vault/secrets/ZITADEL_DB_PASSWORD
   secrets:
     vault:
       enabled: true
       address: "https://vault.blinkchamber.svc:8200"
       token:
-        existingSecret: zitadel-vault-token
-        existingSecretKey: token
+        valueFromFile: /vault/secrets/VAULT_TOKEN
   externalDomain: zitadel.tu-dominio.com
   tls:
     enabled: true

@@ -1,113 +1,60 @@
 # Arquitectura de Alta Disponibilidad para ZITADEL y Vault
 
-Este proyecto contiene los recursos para desplegar una arquitectura de alta disponibilidad de ZITADEL y HashiCorp Vault en un clúster de Kubernetes utilizando Helm.
+Este proyecto contiene los recursos para desplegar una arquitectura de alta disponibilidad de ZITADEL y HashiCorp Vault en un clúster de Kubernetes utilizando Helm y Terraform, con gestión segura de secretos mediante Vault Injector.
 
 ## Requisitos Previos
 
-*   Un clúster de Kubernetes.
+*   Un clúster de Kubernetes (puedes usar Kind para desarrollo local).
 *   Helm 3 instalado.
 *   `kubectl` instalado y configurado para comunicarse con su clúster.
+*   Terraform instalado.
 *   BATS instalado para ejecutar las pruebas.
 
-## Despliegue
+## Despliegue Automatizado
 
-### 1. Desplegar Vault (Chart oficial HashiCorp)
+El flujo recomendado es completamente automatizado y seguro:
 
-1. Agrega el repositorio oficial de HashiCorp:
+1. **Infraestructura base con Terraform**
+    - Provisiona namespaces, cert-manager, nginx-ingress y automatiza la configuración de policies y roles de Vault necesarios para Vault Injector.
+    - Ejecuta:
+      ```bash
+      ./deploy.sh
+      # Opción 1: Desplegar infraestructura base (Terraform)
+      ```
+    - Todos los archivos `.tf` en `terraform/kind/` se aplican juntos, incluyendo la automatización de Vault.
 
-    ```bash
-    helm repo add hashicorp https://helm.releases.hashicorp.com
-    helm repo update
-    ```
+2. **TLS y Vault**
+    - Crea el secret TLS para Vault (opción 2 del script).
+    - Despliega Vault con Helm (opción 3).
+    - Inicializa y desella Vault (opción 4).
 
-2. Crea un archivo `vault-values.yaml` adaptado a tu entorno (ver ejemplo en este repositorio).
+3. **Base de datos y aplicaciones**
+    - Despliega PostgreSQL HA con Vault Injector (opción 5).
+    - Despliega ZITADEL con Vault Injector (opción 6).
 
-3. Despliega Vault en modo HA con el injector habilitado:
+4. **Vault Injector**
+    - Los pods de PostgreSQL y Zitadel obtienen sus secretos directamente desde Vault, sin usar Kubernetes secrets.
+    - Las policies y roles de Vault se crean automáticamente con Terraform (ver `terraform/kind/vault-policies.tf`).
 
-    ```bash
-    helm upgrade --install vault hashicorp/vault -n blinkchamber --create-namespace -f vault-values.yaml
-    ```
+## Ejemplo de flujo con el script
 
-4. Verifica el estado de los pods:
+```bash
+./deploy.sh
+```
 
-    ```bash
-    kubectl get pods -n blinkchamber
-    ```
+El script permite ejecutar cada etapa de forma interactiva y segura.
 
-### 2. Inicializar y desellar Vault
+## Personalización de valores
 
-Después de desplegar Vault, inicializa y desella el clúster:
-
-1. **Inicializa Vault:**
-
-    ```bash
-    kubectl exec -n blinkchamber vault-0 -- vault operator init
-    ```
-    Guarda las claves de desellado y el root token en un lugar seguro.
-
-2. **Desella cada nodo:**
-
-    ```bash
-    kubectl exec -n blinkchamber vault-0 -- vault operator unseal <clave1>
-    kubectl exec -n blinkchamber vault-0 -- vault operator unseal <clave2>
-    kubectl exec -n blinkchamber vault-0 -- vault operator unseal <clave3>
-
-    kubectl exec -n blinkchamber vault-1 -- vault operator unseal <clave1>
-    kubectl exec -n blinkchamber vault-1 -- vault operator unseal <clave2>
-    kubectl exec -n blinkchamber vault-1 -- vault operator unseal <clave3>
-
-    kubectl exec -n blinkchamber vault-2 -- vault operator unseal <clave1>
-    kubectl exec -n blinkchamber vault-2 -- vault operator unseal <clave2>
-    kubectl exec -n blinkchamber vault-2 -- vault operator unseal <clave3>
-    ```
-
-Cuando todos los nodos estén desellados, el clúster estará listo para usarse.
-
-### 3. Desplegar ZITADEL
-
-1. Agrega el repositorio oficial de ZITADEL:
-
-    ```bash
-    helm repo add zitadel https://charts.zitadel.com
-    helm repo update
-    ```
-
-2. Crea un archivo `zitadel-values.yaml` adaptado a tu entorno (ver ejemplo en la documentación oficial o en este repositorio).
-
-3. Despliega ZITADEL en modo HA:
-
-    ```bash
-    helm upgrade --install zitadel zitadel/zitadel --namespace identity --create-namespace -f zitadel-values.yaml
-    ```
+- Personaliza los archivos `vault-values.yaml`, `zitadel-values.yaml` y `postgresql-ha-values.yaml` según tu entorno y necesidades.
+- Los values ya están preparados para usar Vault Injector y no dependen de Kubernetes secrets para credenciales sensibles.
 
 ## Habilitar TLS para Producción
 
 **¡IMPORTANTE!** No uses `tls_disable = true` en producción. Toda comunicación con Vault debe estar cifrada.
 
 1. Elimina o comenta la línea `tls_disable = true` en tu `values.yaml` (en el bloque `extraConfig`).
-2. Agrega la configuración de certificados TLS:
-
-    ```yaml
-    server:
-      extraVolumes:
-        - type: secret
-          name: vault-tls
-          path: /vault/userconfig/tls
-      extraVolumeMounts:
-        - name: vault-tls
-          mountPath: /vault/userconfig/tls
-          readOnly: true
-      extraConfig: |
-        listener "tcp" {
-          address = "0.0.0.0:8200"
-          cluster_address = "0.0.0.0:8201"
-          tls_cert_file = "/vault/userconfig/tls/tls.crt"
-          tls_key_file  = "/vault/userconfig/tls/tls.key"
-          tls_disable   = false
-        }
-        ...
-    ```
-
+2. Agrega la configuración de certificados TLS (ver ejemplo en este repositorio).
 3. Crea un Secret de Kubernetes con tus certificados:
 
     ```bash
@@ -122,29 +69,6 @@ Cuando todos los nodos estén desellados, el clúster estará listo para usarse.
     ```bash
     helm upgrade vault hashicorp/vault -n blinkchamber -f vault-values.yaml
     ```
-
-## Despliegue Automatizado con Script
-
-Para facilitar el despliegue de Vault y ZITADEL, este repositorio incluye el script `deploy.sh` que orquesta todas las etapas necesarias:
-
-```bash
-./deploy.sh
-```
-
-El script permite ejecutar las siguientes etapas de forma interactiva:
-
-1. Desplegar Vault (chart oficial, modo HA)
-2. Inicializar y desellar Vault
-3. Crear secret TLS para Vault
-4. Desplegar ZITADEL (chart oficial, modo HA)
-5. Crear secrets necesarios para ZITADEL (base de datos, token de Vault, TLS)
-6. Desplegar infraestructura base (Terraform)
-7. Desplegar PostgreSQL HA (Bitnami + Vault Injector)
-
-**Notas:**
-- Antes de crear los secrets, asegúrate de tener a mano las contraseñas y certificados necesarios.
-- Puedes ejecutar cada etapa de forma independiente según el estado de tu clúster.
-- Personaliza los archivos `vault-values.yaml`, `zitadel-values.yaml` y `postgresql-ha-values.yaml` según tu entorno.
 
 ## Pruebas
 

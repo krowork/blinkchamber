@@ -26,8 +26,7 @@ postgresql:
   extraEnvVars:
     - name: POSTGRES_PASSWORD_FILE
       value: "/vault/secrets/POSTGRES_PASSWORD"
-  # El chart espera la contraseña como valor, pero aquí la dejamos vacía para que la tome del archivo inyectado
-  password: ""
+  password: "" # No usar Kubernetes secret, solo Vault
 
 pgpool:
   replicaCount: 2
