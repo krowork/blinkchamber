@@ -1,0 +1,232 @@
+# ========================================
+# CONFIGURACIÓN GLOBAL
+# ========================================
+global:
+  # Configuración de namespaces
+  namespaces:
+    infra: "infra"
+    vault: "blinkchamber"
+    database: "database"
+    identity: "identity"
+  
+  # Configuración de TLS
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      clusterIssuer: "letsencrypt-prod"
+
+# ========================================
+# CERT-MANAGER
+# ========================================
+cert-manager:
+  enabled: true
+  installCRDs: true
+  prometheus:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ========================================
+# NGINX-INGRESS
+# ========================================
+ingress-nginx:
+  enabled: true
+  controller:
+    service:
+      type: NodePort
+    ingressClassResource:
+      name: nginx
+      default: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    config:
+      use-proxy-protocol: "false"
+      proxy-real-ip-cidr: "0.0.0.0/0"
+
+# ========================================
+# VAULT
+# ========================================
+vault:
+  enabled: true
+  server:
+    ha:
+      enabled: true
+      replicas: 3
+    extraConfig: |
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        cluster_address = "0.0.0.0:8201"
+        tls_cert_file = "/vault/userconfig/tls/tls.crt"
+        tls_key_file  = "/vault/userconfig/tls/tls.key"
+        tls_disable   = false
+      }
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+      api_addr = "https://vault.blinkchamber.svc:8200"
+      cluster_addr = "https://vault.blinkchamber.svc:8201"
+    extraVolumes:
+      - type: secret
+        name: vault-tls
+        path: /vault/userconfig/tls
+    extraVolumeMounts:
+      - name: vault-tls
+        mountPath: /vault/userconfig/tls
+        readOnly: true
+  injector:
+    enabled: true
+  ui:
+    enabled: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# ========================================
+# POSTGRESQL HA
+# ========================================
+postgresql-ha:
+  enabled: true
+  postgresql:
+    replicaCount: 3
+    podAnnotations:
+      vault.hashicorp.com/agent-inject: "true"
+      vault.hashicorp.com/role: "postgres-role"
+      vault.hashicorp.com/agent-inject-secret-POSTGRES_PASSWORD: "secret/data/postgres#password"
+      vault.hashicorp.com/agent-inject-template-POSTGRES_PASSWORD: |
+        {{- with secret "secret/data/postgres" -}}
+        {{ .Data.data.password }}
+        {{- end }}
+    containerCommand:
+      - /vault-entrypoint/postgresql-ha-vault-entrypoint.sh
+    extraVolumeMounts:
+      - name: vault-entrypoint
+        mountPath: /vault-entrypoint
+        readOnly: true
+      - name: vault-secret
+        mountPath: /vault/secrets
+        readOnly: true
+    extraVolumes:
+      - name: vault-entrypoint
+        configMap:
+          name: postgresql-ha-vault-entrypoint
+      - name: vault-secret
+        emptyDir: {}
+    extraEnvVars:
+      - name: POSTGRES_PASSWORD_FILE
+        value: "/vault/secrets/POSTGRES_PASSWORD"
+    password: "" # No usar Kubernetes secret, solo Vault
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+  pgpool:
+    replicaCount: 2
+    podAnnotations:
+      vault.hashicorp.com/agent-inject: "true"
+      vault.hashicorp.com/role: "postgres-role"
+      vault.hashicorp.com/agent-inject-secret-POSTGRES_PASSWORD: "secret/data/postgres#password"
+      vault.hashicorp.com/agent-inject-template-POSTGRES_PASSWORD: |
+        {{- with secret "secret/data/postgres" -}}
+        {{ .Data.data.password }}
+        {{- end }}
+    extraEnvVars:
+      - name: POSTGRES_PASSWORD_FILE
+        value: "/vault/secrets/POSTGRES_PASSWORD"
+    extraVolumeMounts:
+      - name: vault-secret
+        mountPath: /vault/secrets
+        readOnly: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ========================================
+# ZITADEL
+# ========================================
+zitadel:
+  enabled: true
+  replicaCount: 2
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: true
+    hosts:
+      - host: zitadel.tu-dominio.com
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+    tls: []
+
+  podAnnotations:
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "zitadel-role"
+    vault.hashicorp.com/agent-inject-secret-ZITADEL_DB_PASSWORD: "secret/data/zitadel/postgres#password"
+    vault.hashicorp.com/agent-inject-template-ZITADEL_DB_PASSWORD: |
+      {{- with secret "secret/data/zitadel/postgres" -}}
+      {{ .Data.data.password }}
+      {{- end }}
+    vault.hashicorp.com/agent-inject-secret-VAULT_TOKEN: "secret/data/zitadel/vault#token"
+    vault.hashicorp.com/agent-inject-template-VAULT_TOKEN: |
+      {{- with secret "secret/data/zitadel/vault" -}}
+      {{ .Data.data.token }}
+      {{- end }}
+
+  config:
+    database:
+      postgres:
+        host: postgresql-ha-postgresql.database.svc.cluster.local
+        port: 5432
+        database: zitadel
+        user: zitadel
+        password:
+          valueFromFile: /vault/secrets/ZITADEL_DB_PASSWORD
+    secrets:
+      vault:
+        enabled: true
+        address: "https://vault.blinkchamber.svc:8200"
+        token:
+          valueFromFile: /vault/secrets/VAULT_TOKEN
+    externalDomain: zitadel.tu-dominio.com
+    tls:
+      enabled: true
+      secretName: zitadel-tls
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80 

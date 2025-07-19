@@ -1,42 +1,43 @@
-# 🚀 BlinkChamber Platform - Arquitectura de Alta Disponibilidad
+# 🚀 BlinkChamber Platform - Chart Umbrella
 
-Este proyecto contiene un **chart umbrella de Helm** que despliega una arquitectura completa de alta disponibilidad con ZITADEL, HashiCorp Vault y PostgreSQL en Kubernetes, con gestión segura de secretos mediante Vault Injector.
+Este es un **chart umbrella** (padre) que despliega una plataforma completa de alta disponibilidad con ZITADEL, Vault, PostgreSQL y componentes de infraestructura.
 
 ## 🎯 ¿Qué incluye?
 
-### 📦 Componentes de la Plataforma:
+### 📦 Componentes del Chart Umbrella:
 
 1. **🔐 Cert-Manager** - Gestión automática de certificados TLS
-2. **🌐 Nginx-Ingress** - Controlador de ingress para Kubernetes  
+2. **🌐 Nginx-Ingress** - Controlador de ingress para Kubernetes
 3. **🗄️ Vault HA** - Gestión de secretos con alta disponibilidad (3 réplicas)
 4. **🐘 PostgreSQL HA** - Base de datos de alta disponibilidad (3 réplicas + 2 PgPool)
 5. **🆔 ZITADEL** - Plataforma de identidad y autenticación (2+ réplicas)
 
 ### 🔧 Características:
 
-- **Chart Umbrella** - Gestión unificada de todos los componentes
-- **Vault Injector** - Gestión segura de secretos sin Kubernetes secrets
-- **Alta Disponibilidad** - Todos los componentes críticos con múltiples réplicas
-- **Despliegue Simplificado** - Un solo comando para toda la plataforma
+- **Gestión unificada** de versiones y dependencias
+- **Configuración centralizada** en un solo `values.yaml`
+- **Vault Injector** para gestión segura de secretos
+- **Alta disponibilidad** en todos los componentes críticos
+- **Despliegue con un solo comando**
 
 ## 🚀 Despliegue Rápido
 
-### 1. Crear clúster Kind (opcional):
-
-```bash
-./create-kind-cluster.sh
-```
-
-### 2. Instalar la plataforma completa:
+### 1. Instalar la plataforma completa:
 
 ```bash
 ./deploy-umbrella.sh install
 ```
 
-### 3. Verificar el estado:
+### 2. Verificar el estado:
 
 ```bash
 ./deploy-umbrella.sh status
+```
+
+### 3. Ver logs:
+
+```bash
+./deploy-umbrella.sh logs
 ```
 
 ## 📋 Comandos Disponibles
@@ -74,11 +75,13 @@ zitadel:
 
 ### Configuración por entorno:
 
+Puedes crear archivos de valores específicos:
+
 ```bash
 # Desarrollo
 helm upgrade --install blinkchamber . -f values.yaml -f values-dev.yaml
 
-# Producción  
+# Producción
 helm upgrade --install blinkchamber . -f values.yaml -f values-prod.yaml
 ```
 
@@ -167,20 +170,18 @@ helm dependency update
 
 **⚠️ Advertencia**: Esto eliminará todos los datos. Asegúrate de hacer backup antes.
 
-## 📁 Estructura del Proyecto
+## 📁 Estructura del Chart
 
 ```
 .
-├── Chart.yaml              # Metadatos y dependencias del chart umbrella
+├── Chart.yaml              # Metadatos y dependencias
 ├── values.yaml             # Configuración principal
-├── deploy-umbrella.sh      # Script de despliegue simplificado
-├── create-kind-cluster.sh  # Script para crear clúster Kind
+├── deploy-umbrella.sh      # Script de despliegue
 ├── templates/
 │   ├── namespaces.yaml     # Namespaces necesarios
 │   ├── vault-policies.yaml # Policies y roles de Vault
 │   ├── postgresql-entrypoint-configmap.yaml # Entrypoint para PostgreSQL
 │   └── notes.txt           # Notas post-instalación
-├── tests/                  # Pruebas BATS
 └── charts/                 # Subcharts descargados automáticamente
 ```
 
@@ -202,20 +203,12 @@ kubectl get events -A --sort-by='.lastTimestamp'
 kubectl logs -n blinkchamber vault-0 --previous
 ```
 
-## 🧪 Pruebas
+## 📚 Documentación Adicional
 
-Para ejecutar las pruebas de BATS:
-
-```bash
-bats tests/test_exhaustive.bats
-```
-
-## 📚 Documentación
-
-- [Documentación detallada del Chart Umbrella](README-UMBRELLA.md)
 - [Arquitectura detallada](arquitectura_ha_zitadel_vault.md)
 - [Configuración de Vault](https://www.vaultproject.io/docs)
 - [Documentación de ZITADEL](https://zitadel.com/docs)
+- [PostgreSQL HA](https://github.com/bitnami/charts/tree/main/bitnami/postgresql-ha)
 
 ## 🤝 Contribuir
 
@@ -227,4 +220,4 @@ bats tests/test_exhaustive.bats
 
 ---
 
-**🎉 ¡Disfruta de tu plataforma de alta disponibilidad!**
+**🎉 ¡Disfruta de tu plataforma de alta disponibilidad!** 

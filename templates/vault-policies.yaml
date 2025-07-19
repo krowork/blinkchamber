@@ -1,0 +1,53 @@
+{{- if .Values.vault.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-policies
+  namespace: {{ .Values.global.namespaces.vault }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    vault-policies: "true"
+
+data:
+  postgres-policy.hcl: |
+    path "secret/data/postgres" {
+      capabilities = ["read"]
+    }
+    
+  zitadel-policy.hcl: |
+    path "secret/data/zitadel/postgres" {
+      capabilities = ["read"]
+    }
+    path "secret/data/zitadel/vault" {
+      capabilities = ["read"]
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vault-roles
+  namespace: {{ .Values.global.namespaces.vault }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    vault-roles: "true"
+
+data:
+  postgres-role.json: |
+    {
+      "role_name": "postgres-role",
+      "bound_service_account_names": ["postgresql-ha"],
+      "bound_service_account_namespaces": ["{{ .Values.global.namespaces.database }}"],
+      "policies": ["postgres-policy"],
+      "ttl": 86400
+    }
+    
+  zitadel-role.json: |
+    {
+      "role_name": "zitadel-role", 
+      "bound_service_account_names": ["zitadel"],
+      "bound_service_account_namespaces": ["{{ .Values.global.namespaces.identity }}"],
+      "policies": ["zitadel-policy"],
+      "ttl": 86400
+    }
+{{- end }} 

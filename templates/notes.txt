@@ -1,0 +1,69 @@
+{{- if .Values.vault.enabled }}
+===========================================
+🎉 BLINKCHAMBER PLATFORM DESPLEGADA
+===========================================
+
+📋 COMPONENTES INSTALADOS:
+{{- if .Values.cert-manager.enabled }}
+✅ Cert-Manager (v{{ .Chart.Dependencies | find "cert-manager" | first | get "version" }})
+{{- end }}
+{{- if .Values.ingress-nginx.enabled }}
+✅ Nginx-Ingress (v{{ .Chart.Dependencies | find "ingress-nginx" | first | get "version" }})
+{{- end }}
+{{- if .Values.vault.enabled }}
+✅ Vault HA (v{{ .Chart.Dependencies | find "vault" | first | get "version" }}) - {{ .Values.vault.server.ha.replicas }} réplicas
+{{- end }}
+{{- if .Values.postgresql-ha.enabled }}
+✅ PostgreSQL HA (v{{ .Chart.Dependencies | find "postgresql-ha" | first | get "version" }}) - {{ .Values.postgresql-ha.postgresql.replicaCount }} réplicas
+{{- end }}
+{{- if .Values.zitadel.enabled }}
+✅ ZITADEL (v{{ .Chart.Dependencies | find "zitadel" | first | get "version" }}) - {{ .Values.zitadel.replicaCount }} réplicas
+{{- end }}
+
+🔐 PRÓXIMOS PASOS PARA VAULT:
+
+1. Inicializar Vault:
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault operator init
+
+2. Desellar Vault (necesitarás las claves de desello):
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault operator unseal
+
+3. Habilitar autenticación de Kubernetes:
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault auth enable kubernetes
+
+4. Crear policies y roles (usando los ConfigMaps creados):
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault policy write postgres-policy /tmp/postgres-policy.hcl
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault policy write zitadel-policy /tmp/zitadel-policy.hcl
+
+5. Crear secretos en Vault:
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/postgres password="tu-password-seguro"
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/zitadel/postgres password="tu-password-zitadel"
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/zitadel/vault token="tu-token-vault"
+
+🌐 ACCESO A SERVICIOS:
+
+- Vault UI: https://vault.{{ .Values.global.namespaces.vault }}.svc:8200
+- ZITADEL: https://{{ .Values.zitadel.ingress.hosts | first | get "host" }}
+- PostgreSQL: postgresql-ha-postgresql.{{ .Values.global.namespaces.database }}.svc:5432
+
+📊 MONITORIZACIÓN:
+
+Para ver el estado de todos los componentes:
+kubectl get pods -A -l app.kubernetes.io/part-of={{ .Chart.Name }}
+
+Para ver logs de Vault:
+kubectl logs -n {{ .Values.global.namespaces.vault }} -l app.kubernetes.io/name=vault
+
+Para ver logs de ZITADEL:
+kubectl logs -n {{ .Values.global.namespaces.identity }} -l app.kubernetes.io/name=zitadel
+
+🔧 CONFIGURACIÓN ADICIONAL:
+
+- Ajusta los valores en values.yaml según tu entorno
+- Configura certificados TLS para producción
+- Revisa las políticas de seguridad de Vault
+- Configura backup automático de la base de datos
+
+📚 DOCUMENTACIÓN:
+Consulta el README.md para más detalles sobre la arquitectura y configuración.
+{{- end }} 

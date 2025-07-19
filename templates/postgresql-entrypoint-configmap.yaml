@@ -2,10 +2,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgresql-ha-vault-entrypoint
-  namespace: database # Cambia si usas otro namespace
+  namespace: {{ .Values.global.namespaces.database }}
   labels:
     app: postgresql-ha
     vault-injector: enabled
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
 
 data:
   postgresql-ha-vault-entrypoint.sh: |
