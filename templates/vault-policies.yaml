@@ -14,11 +14,19 @@ data:
       capabilities = ["read"]
     }
     
+  redis-policy.hcl: |
+    path "secret/data/redis" {
+      capabilities = ["read"]
+    }
+    
   zitadel-policy.hcl: |
     path "secret/data/zitadel/postgres" {
       capabilities = ["read"]
     }
     path "secret/data/zitadel/vault" {
+      capabilities = ["read"]
+    }
+    path "secret/data/redis" {
       capabilities = ["read"]
     }
 
@@ -39,6 +47,15 @@ data:
       "bound_service_account_names": ["postgresql-ha"],
       "bound_service_account_namespaces": ["{{ .Values.global.namespaces.database }}"],
       "policies": ["postgres-policy"],
+      "ttl": 86400
+    }
+    
+  redis-role.json: |
+    {
+      "role_name": "redis-role",
+      "bound_service_account_names": ["redis"],
+      "bound_service_account_namespaces": ["{{ .Values.global.namespaces.database }}"],
+      "policies": ["redis-policy"],
       "ttl": 86400
     }
     

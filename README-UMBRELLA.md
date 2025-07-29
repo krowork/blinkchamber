@@ -10,7 +10,8 @@ Este es un **chart umbrella** (padre) que despliega una plataforma completa de a
 2. **🌐 Nginx-Ingress** - Controlador de ingress para Kubernetes
 3. **🗄️ Vault HA** - Gestión de secretos con alta disponibilidad (3 réplicas)
 4. **🐘 PostgreSQL HA** - Base de datos de alta disponibilidad (3 réplicas + 2 PgPool)
-5. **🆔 ZITADEL** - Plataforma de identidad y autenticación (2+ réplicas)
+5. **🔴 Redis HA** - Cache y sesiones de alta disponibilidad (3 master + 3 réplicas + 3 Sentinel)
+6. **🆔 ZITADEL** - Plataforma de identidad y autenticación con Event Streaming (2+ réplicas)
 
 ### 🔧 Características:
 
@@ -18,6 +19,7 @@ Este es un **chart umbrella** (padre) que despliega una plataforma completa de a
 - **Configuración centralizada** en un solo `values.yaml`
 - **Vault Injector** para gestión segura de secretos
 - **Alta disponibilidad** en todos los componentes críticos
+- **Event Streaming** - Publicación eficiente de eventos en colas Redis con prioridades
 - **Despliegue con un solo comando**
 
 ## 🚀 Despliegue Rápido
@@ -114,6 +116,9 @@ kubectl exec -n blinkchamber vault-0 -- vault policy write zitadel-policy /tmp/z
 # Secretos para PostgreSQL
 kubectl exec -n blinkchamber vault-0 -- vault kv put secret/data/postgres password="tu-password-seguro"
 
+# Secretos para Redis
+kubectl exec -n blinkchamber vault-0 -- vault kv put secret/data/redis password="tu-password-redis"
+
 # Secretos para ZITADEL
 kubectl exec -n blinkchamber vault-0 -- vault kv put secret/data/zitadel/postgres password="tu-password-zitadel"
 kubectl exec -n blinkchamber vault-0 -- vault kv put secret/data/zitadel/vault token="tu-token-vault"
@@ -126,6 +131,7 @@ kubectl exec -n blinkchamber vault-0 -- vault kv put secret/data/zitadel/vault t
 | Vault UI | `https://vault.blinkchamber.svc:8200` | Interfaz web de Vault |
 | ZITADEL | `https://zitadel.tu-dominio.com` | Plataforma de identidad |
 | PostgreSQL | `postgresql-ha-postgresql.database.svc:5432` | Base de datos |
+| Redis | `redis-master.database.svc:6379` | Cache y sesiones |
 
 ## 📊 Monitorización
 
@@ -146,6 +152,46 @@ kubectl logs -n identity -l app.kubernetes.io/name=zitadel
 
 # Logs de PostgreSQL
 kubectl logs -n database -l app.kubernetes.io/name=postgresql-ha
+```
+
+## 🚀 Event Streaming
+
+### 📊 Configuración de Eventos
+
+ZITADEL está configurado para publicar eventos en colas Redis con diferentes prioridades:
+
+```yaml
+zitadel:
+  config:
+    events:
+      enabled: true
+      publishing:
+        batchSize: 100
+        batchTimeout: 1s
+        compression: true
+      queues:
+        high_priority: "zitadel:events:high"     # Auth events
+        normal_priority: "zitadel:events:normal"  # CRUD events
+        low_priority: "zitadel:events:low"       # Analytics events
+```
+
+### 🎯 Tipos de Eventos
+
+- **High Priority**: `auth.login`, `auth.logout`, `auth.failed`
+- **Normal Priority**: `user.created`, `org.created`, `project.created`
+- **Low Priority**: `user.profile_viewed`, `analytics.page_viewed`
+
+### 📈 Monitorización de Eventos
+
+```bash
+# Ver eventos en colas
+kubectl exec -n database redis-master-0 -- redis-cli LRANGE zitadel:events:high 0 -1
+
+# Ver métricas de eventos
+kubectl exec -n identity zitadel-0 -- curl -s localhost:8080/metrics | grep event
+
+# Monitorizar rendimiento
+kubectl exec -n database redis-master-0 -- redis-cli info stats
 ```
 
 ## 🔄 Actualizaciones
@@ -206,6 +252,8 @@ kubectl logs -n blinkchamber vault-0 --previous
 ## 📚 Documentación Adicional
 
 - [Arquitectura detallada](arquitectura_ha_zitadel_vault.md)
+- [Integración Redis-ZITADEL](REDIS-ZITADEL-INTEGRATION.md)
+- [Resumen de integración Redis](REDIS-INTEGRATION-SUMMARY.md)
 - [Configuración de Vault](https://www.vaultproject.io/docs)
 - [Documentación de ZITADEL](https://zitadel.com/docs)
 - [PostgreSQL HA](https://github.com/bitnami/charts/tree/main/bitnami/postgresql-ha)

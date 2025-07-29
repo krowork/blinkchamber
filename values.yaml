@@ -165,6 +165,84 @@ postgresql-ha:
         memory: 256Mi
 
 # ========================================
+# REDIS HA
+# ========================================
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+    sentinel: true
+  master:
+    replicaCount: 3
+    podAnnotations:
+      vault.hashicorp.com/agent-inject: "true"
+      vault.hashicorp.com/role: "redis-role"
+      vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
+      vault.hashicorp.com/agent-inject-template-REDIS_PASSWORD: |
+        {{- with secret "secret/data/redis" -}}
+        {{ .Data.data.password }}
+        {{- end }}
+    extraEnvVars:
+      - name: REDIS_PASSWORD_FILE
+        value: "/vault/secrets/REDIS_PASSWORD"
+    extraVolumeMounts:
+      - name: vault-secret
+        mountPath: /vault/secrets
+        readOnly: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+      
+  replica:
+    replicaCount: 3
+    podAnnotations:
+      vault.hashicorp.com/agent-inject: "true"
+      vault.hashicorp.com/role: "redis-role"
+      vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
+      vault.hashicorp.com/agent-inject-template-REDIS_PASSWORD: |
+        {{- with secret "secret/data/redis" -}}
+        {{ .Data.data.password }}
+        {{- end }}
+    extraEnvVars:
+      - name: REDIS_PASSWORD_FILE
+        value: "/vault/secrets/REDIS_PASSWORD"
+    extraVolumeMounts:
+      - name: vault-secret
+        mountPath: /vault/secrets
+        readOnly: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+      
+  sentinel:
+    enabled: true
+    replicaCount: 3
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ========================================
 # ZITADEL
 # ========================================
 zitadel:
@@ -196,6 +274,11 @@ zitadel:
       {{- with secret "secret/data/zitadel/vault" -}}
       {{ .Data.data.token }}
       {{- end }}
+    vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
+    vault.hashicorp.com/agent-inject-template-REDIS_PASSWORD: |
+      {{- with secret "secret/data/redis" -}}
+      {{ .Data.data.password }}
+      {{- end }}
 
   config:
     database:
@@ -206,6 +289,81 @@ zitadel:
         user: zitadel
         password:
           valueFromFile: /vault/secrets/ZITADEL_DB_PASSWORD
+    cache:
+      redis:
+        enabled: true
+        host: redis-master.database.svc.cluster.local
+        port: 6379
+        password:
+          valueFromFile: /vault/secrets/REDIS_PASSWORD
+        database: 0
+        poolSize: 10
+        maxRetries: 3
+        dialTimeout: 5s
+        readTimeout: 3s
+        writeTimeout: 3s
+        poolTimeout: 4s
+        idleTimeout: 5m
+        maxConnAge: 30m
+    
+    # Event Streaming Configuration
+    events:
+      enabled: true
+      redis:
+        enabled: true
+        host: redis-master.database.svc.cluster.local
+        port: 6379
+        password:
+          valueFromFile: /vault/secrets/REDIS_PASSWORD
+        database: 1  # Separate database for events
+        poolSize: 20  # Larger pool for event publishing
+        maxRetries: 5
+        dialTimeout: 3s
+        readTimeout: 2s
+        writeTimeout: 2s
+        poolTimeout: 3s
+        idleTimeout: 10m
+        maxConnAge: 1h
+      publishing:
+        enabled: true
+        batchSize: 100
+        batchTimeout: 1s
+        maxRetries: 3
+        retryDelay: 100ms
+        compression: true
+      types:
+        - "user.created"
+        - "user.updated"
+        - "user.deleted"
+        - "org.created"
+        - "org.updated"
+        - "org.deleted"
+        - "project.created"
+        - "project.updated"
+        - "project.deleted"
+        - "app.created"
+        - "app.updated"
+        - "app.deleted"
+        - "auth.login"
+        - "auth.logout"
+        - "auth.failed"
+        - "policy.created"
+        - "policy.updated"
+        - "policy.deleted"
+        - "role.created"
+        - "role.updated"
+        - "role.deleted"
+      queues:
+        high_priority: "zitadel:events:high"
+        normal_priority: "zitadel:events:normal"
+        low_priority: "zitadel:events:low"
+        dead_letter: "zitadel:events:dead_letter"
+      performance:
+        workerCount: 10
+        maxConcurrentEvents: 1000
+        eventBufferSize: 5000
+        flushInterval: 500ms
+        enableMetrics: true
     secrets:
       vault:
         enabled: true

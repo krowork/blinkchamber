@@ -16,6 +16,9 @@
 {{- if .Values.postgresql-ha.enabled }}
 ✅ PostgreSQL HA (v{{ .Chart.Dependencies | find "postgresql-ha" | first | get "version" }}) - {{ .Values.postgresql-ha.postgresql.replicaCount }} réplicas
 {{- end }}
+{{- if .Values.redis.enabled }}
+✅ Redis HA (v{{ .Chart.Dependencies | find "redis" | first | get "version" }}) - {{ .Values.redis.master.replicaCount }} master + {{ .Values.redis.replica.replicaCount }} réplicas
+{{- end }}
 {{- if .Values.zitadel.enabled }}
 ✅ ZITADEL (v{{ .Chart.Dependencies | find "zitadel" | first | get "version" }}) - {{ .Values.zitadel.replicaCount }} réplicas
 {{- end }}
@@ -37,6 +40,7 @@
 
 5. Crear secretos en Vault:
    kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/postgres password="tu-password-seguro"
+   kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/redis password="tu-password-redis"
    kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/zitadel/postgres password="tu-password-zitadel"
    kubectl exec -n {{ .Values.global.namespaces.vault }} vault-0 -- vault kv put secret/data/zitadel/vault token="tu-token-vault"
 
@@ -45,6 +49,7 @@
 - Vault UI: https://vault.{{ .Values.global.namespaces.vault }}.svc:8200
 - ZITADEL: https://{{ .Values.zitadel.ingress.hosts | first | get "host" }}
 - PostgreSQL: postgresql-ha-postgresql.{{ .Values.global.namespaces.database }}.svc:5432
+- Redis: redis-master.{{ .Values.global.namespaces.database }}.svc:6379
 
 📊 MONITORIZACIÓN:
 
@@ -56,6 +61,14 @@ kubectl logs -n {{ .Values.global.namespaces.vault }} -l app.kubernetes.io/name=
 
 Para ver logs de ZITADEL:
 kubectl logs -n {{ .Values.global.namespaces.identity }} -l app.kubernetes.io/name=zitadel
+
+🚀 EVENT STREAMING:
+
+Para verificar eventos en colas Redis:
+kubectl exec -n {{ .Values.global.namespaces.database }} redis-master-0 -- redis-cli LRANGE zitadel:events:high 0 -1
+
+Para ver métricas de eventos:
+kubectl exec -n {{ .Values.global.namespaces.identity }} zitadel-0 -- curl -s localhost:8080/metrics | grep event
 
 🔧 CONFIGURACIÓN ADICIONAL:
 
