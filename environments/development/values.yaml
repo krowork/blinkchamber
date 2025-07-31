@@ -1,0 +1,183 @@
+# ========================================
+# ENTORNO DE DESARROLLO - RECURSOS MODERADOS
+# ========================================
+
+# Heredar configuración base
+import:
+  - ../base/values.yaml
+
+# ========================================
+# OVERRIDES ESPECÍFICOS PARA DESARROLLO
+# ========================================
+
+# Configuración global para desarrollo
+global:
+  environment: "development"
+  domain: "dev.blinkchamber.local"
+  
+  # Configuración de TLS para desarrollo
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      clusterIssuer: "letsencrypt-staging"  # Certificados de staging
+
+# ========================================
+# VAULT - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+vault:
+  server:
+    ha:
+      replicas: 1  # Una sola instancia para desarrollo
+    extraConfig: |
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        cluster_address = "0.0.0.0:8201"
+        tls_cert_file = "/vault/userconfig/tls/tls.crt"
+        tls_key_file  = "/vault/userconfig/tls/tls.key"
+        tls_disable   = false
+      }
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+      api_addr = "https://vault.blinkchamber.svc:8200"
+      cluster_addr = "https://vault.blinkchamber.svc:8201"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# ========================================
+# POSTGRESQL - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+postgresql-ha:
+  postgresql:
+    primary:
+      persistence:
+        enabled: true
+        size: 5Gi  # Menor tamaño para desarrollo
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    readReplicas:
+      replicaCount: 1  # Una réplica para desarrollo
+      persistence:
+        enabled: true
+        size: 5Gi
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    pgpool:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+# ========================================
+# REDIS - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+redis:
+  architecture: replication
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi  # Menor tamaño para desarrollo
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  replica:
+    replicaCount: 1  # Una réplica para desarrollo
+    persistence:
+      enabled: true
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ========================================
+# ZITADEL - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+zitadel:
+  zitadel:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 300m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 5Gi  # Menor tamaño para desarrollo
+
+# ========================================
+# NGINX-INGRESS - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+ingress-nginx:
+  controller:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ========================================
+# CERT-MANAGER - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+cert-manager:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+
+
+
+
+# ========================================
+# MAILU - CONFIGURACIÓN PARA DESARROLLO
+# ========================================
+mailu:
+  # Configuración específica para desarrollo
+  hostnames:
+    - mail.dev.blinkchamber.local
+  
+  domain: "dev.blinkchamber.local"
+  
+  # Recursos reducidos para desarrollo
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 300m
+      memory: 512Mi 

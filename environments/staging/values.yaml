@@ -1,0 +1,183 @@
+# ========================================
+# ENTORNO DE STAGING - SIMILAR A PRODUCCIÓN
+# ========================================
+
+# Heredar configuración base
+import:
+  - ../base/values.yaml
+
+# ========================================
+# OVERRIDES ESPECÍFICOS PARA STAGING
+# ========================================
+
+# Configuración global para staging
+global:
+  environment: "staging"
+  domain: "staging.blinkchamber.com"
+  
+  # Configuración de TLS para staging
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      clusterIssuer: "letsencrypt-staging"  # Certificados de staging
+
+# ========================================
+# VAULT - CONFIGURACIÓN PARA STAGING
+# ========================================
+vault:
+  server:
+    ha:
+      replicas: 3  # Alta disponibilidad como producción
+    extraConfig: |
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        cluster_address = "0.0.0.0:8201"
+        tls_cert_file = "/vault/userconfig/tls/tls.crt"
+        tls_key_file  = "/vault/userconfig/tls/tls.key"
+        tls_disable   = false
+      }
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+      api_addr = "https://vault.blinkchamber.svc:8200"
+      cluster_addr = "https://vault.blinkchamber.svc:8201"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# ========================================
+# POSTGRESQL - CONFIGURACIÓN PARA STAGING
+# ========================================
+postgresql-ha:
+  postgresql:
+    primary:
+      persistence:
+        enabled: true
+        size: 20Gi  # Tamaño similar a producción
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+    readReplicas:
+      replicaCount: 2  # Dos réplicas como producción
+      persistence:
+        enabled: true
+        size: 20Gi
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+    pgpool:
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+# ========================================
+# REDIS - CONFIGURACIÓN PARA STAGING
+# ========================================
+redis:
+  architecture: replication
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi  # Tamaño similar a producción
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  replica:
+    replicaCount: 2  # Dos réplicas como producción
+    persistence:
+      enabled: true
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# ========================================
+# ZITADEL - CONFIGURACIÓN PARA STAGING
+# ========================================
+zitadel:
+  zitadel:
+    replicaCount: 2  # Dos réplicas como producción
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 20Gi  # Tamaño similar a producción
+
+# ========================================
+# NGINX-INGRESS - CONFIGURACIÓN PARA STAGING
+# ========================================
+ingress-nginx:
+  controller:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# ========================================
+# CERT-MANAGER - CONFIGURACIÓN PARA STAGING
+# ========================================
+cert-manager:
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+
+
+
+
+# ========================================
+# MAILU - CONFIGURACIÓN PARA STAGING
+# ========================================
+mailu:
+  # Configuración específica para staging
+  hostnames:
+    - mail.staging.blinkchamber.com
+  
+  domain: "staging.blinkchamber.com"
+  
+  # Recursos similares a producción
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi 

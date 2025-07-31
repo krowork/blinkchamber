@@ -12,6 +12,7 @@ Este proyecto contiene un **chart umbrella de Helm** que despliega una arquitect
 4. **🐘 PostgreSQL HA** - Base de datos de alta disponibilidad (3 réplicas + 2 PgPool)
 5. **🔴 Redis HA** - Cache y sesiones de alta disponibilidad (3 master + 3 réplicas + 3 Sentinel)
 6. **🆔 ZITADEL** - Plataforma de identidad y autenticación con Event Streaming (2+ réplicas)
+7. **📧 Mailu** - Sistema completo de email (SMTP, IMAP, Webmail) con alta disponibilidad
 
 ### 🔧 Características:
 
@@ -19,6 +20,7 @@ Este proyecto contiene un **chart umbrella de Helm** que despliega una arquitect
 - **Vault Injector** - Gestión segura de secretos sin Kubernetes secrets
 - **Alta Disponibilidad** - Todos los componentes críticos con múltiples réplicas
 - **Event Streaming** - Publicación eficiente de eventos en colas Redis con prioridades
+- **Sistema de Email Completo** - Mailu con SMTP, IMAP/POP3 y webmail integrados
 - **Despliegue Simplificado** - Un solo comando para toda la plataforma
 
 ## 🚀 Despliegue Rápido
@@ -230,6 +232,8 @@ helm dependency update
 └── charts/                 # Subcharts descargados automáticamente
 ```
 
+
+
 ## 🔧 Troubleshooting
 
 ### Problemas comunes:
@@ -262,6 +266,7 @@ bats tests/test_exhaustive.bats
 - [Arquitectura detallada](arquitectura_ha_zitadel_vault.md)
 - [Integración Redis-ZITADEL](REDIS-ZITADEL-INTEGRATION.md)
 - [Resumen de integración Redis](REDIS-INTEGRATION-SUMMARY.md)
+- [Integración de Email](EMAIL-INTEGRATION.md)
 - [Configuración de Vault](https://www.vaultproject.io/docs)
 - [Documentación de ZITADEL](https://zitadel.com/docs)
 

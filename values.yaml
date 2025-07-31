@@ -279,6 +279,16 @@ zitadel:
       {{- with secret "secret/data/redis" -}}
       {{ .Data.data.password }}
       {{- end }}
+    vault.hashicorp.com/agent-inject-secret-SMTP_USER: "secret/data/mailu#admin_username"
+    vault.hashicorp.com/agent-inject-template-SMTP_USER: |
+      {{- with secret "secret/data/mailu" -}}
+      {{ .Data.data.admin_username }}
+      {{- end }}
+    vault.hashicorp.com/agent-inject-secret-SMTP_PASSWORD: "secret/data/mailu#admin_password"
+    vault.hashicorp.com/agent-inject-template-SMTP_PASSWORD: |
+      {{- with secret "secret/data/mailu" -}}
+      {{ .Data.data.admin_password }}
+      {{- end }}
 
   config:
     database:
@@ -370,6 +380,22 @@ zitadel:
         address: "https://vault.blinkchamber.svc:8200"
         token:
           valueFromFile: /vault/secrets/VAULT_TOKEN
+    
+    # Configuración de notificaciones por email
+    notifications:
+      email:
+        enabled: true
+        smtp:
+          host: "blinkchamber-platform-mailu-front.blinkchamber.svc"
+          port: 587
+          user:
+            valueFromFile: /vault/secrets/SMTP_USER
+          password:
+            valueFromFile: /vault/secrets/SMTP_PASSWORD
+          startTLS: true
+          from: "noreply@blinkchamber.local"
+          replyTo: "support@blinkchamber.local"
+    
     externalDomain: zitadel.tu-dominio.com
     tls:
       enabled: true

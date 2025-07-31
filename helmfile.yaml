@@ -1,0 +1,105 @@
+# ========================================
+# HELMFILE PARA GESTIÓN DE MÚLTIPLES ENTORNOS
+# ========================================
+
+repositories:
+  - name: jetstack
+    url: https://charts.jetstack.io
+  - name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+  - name: bitnami
+    url: https://charts.bitnami.com/bitnami
+  - name: hashicorp
+    url: https://helm.releases.hashicorp.com
+  - name: zitadel
+    url: https://charts.zitadel.com
+
+releases:
+  # ========================================
+  # ENTORNO DE TEST
+  # ========================================
+  - name: blinkchamber-test
+    namespace: blinkchamber-test
+    createNamespace: true
+    chart: ./.
+    version: 0.1.0
+    values:
+      - environments/test/values.yaml
+    labels:
+      environment: test
+      managed-by: argocd
+    hooks:
+      - events: ["prepare"]
+        showlogs: true
+        command: "kubectl"
+        args: ["create", "namespace", "blinkchamber-test", "--dry-run=client", "-o", "yaml", "|", "kubectl", "apply", "-f", "-"]
+
+  # ========================================
+  # ENTORNO DE DESARROLLO
+  # ========================================
+  - name: blinkchamber-dev
+    namespace: blinkchamber-dev
+    createNamespace: true
+    chart: ./.
+    version: 0.1.0
+    values:
+      - environments/development/values.yaml
+    labels:
+      environment: development
+      managed-by: argocd
+    hooks:
+      - events: ["prepare"]
+        showlogs: true
+        command: "kubectl"
+        args: ["create", "namespace", "blinkchamber-dev", "--dry-run=client", "-o", "yaml", "|", "kubectl", "apply", "-f", "-"]
+
+  # ========================================
+  # ENTORNO DE STAGING
+  # ========================================
+  - name: blinkchamber-staging
+    namespace: blinkchamber-staging
+    createNamespace: true
+    chart: ./.
+    version: 0.1.0
+    values:
+      - environments/staging/values.yaml
+    labels:
+      environment: staging
+      managed-by: argocd
+    hooks:
+      - events: ["prepare"]
+        showlogs: true
+        command: "kubectl"
+        args: ["create", "namespace", "blinkchamber-staging", "--dry-run=client", "-o", "yaml", "|", "kubectl", "apply", "-f", "-"]
+
+  # ========================================
+  # ENTORNO DE PRODUCCIÓN
+  # ========================================
+  - name: blinkchamber-prod
+    namespace: blinkchamber-prod
+    createNamespace: true
+    chart: ./.
+    version: 0.1.0
+    values:
+      - environments/production/values.yaml
+    labels:
+      environment: production
+      managed-by: argocd
+    hooks:
+      - events: ["prepare"]
+        showlogs: true
+        command: "kubectl"
+        args: ["create", "namespace", "blinkchamber-prod", "--dry-run=client", "-o", "yaml", "|", "kubectl", "apply", "-f", "-"]
+
+# ========================================
+# CONFIGURACIÓN GLOBAL
+# ========================================
+helmDefaults:
+  wait: true
+  timeout: 600
+  atomic: true
+  cleanupOnFail: true
+  force: false
+  resetValues: false
+  reuseValues: false
+  maxHistory: 10 

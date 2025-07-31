@@ -1,0 +1,183 @@
+# ========================================
+# ENTORNO DE PRODUCCIÓN - MÁXIMA SEGURIDAD Y RECURSOS
+# ========================================
+
+# Heredar configuración base
+import:
+  - ../base/values.yaml
+
+# ========================================
+# OVERRIDES ESPECÍFICOS PARA PRODUCCIÓN
+# ========================================
+
+# Configuración global para producción
+global:
+  environment: "production"
+  domain: "blinkchamber.com"
+  
+  # Configuración de TLS para producción
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      clusterIssuer: "letsencrypt-prod"  # Certificados de producción
+
+# ========================================
+# VAULT - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+vault:
+  server:
+    ha:
+      replicas: 5  # Máxima disponibilidad
+    extraConfig: |
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        cluster_address = "0.0.0.0:8201"
+        tls_cert_file = "/vault/userconfig/tls/tls.crt"
+        tls_key_file  = "/vault/userconfig/tls/tls.key"
+        tls_disable   = false
+      }
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+      api_addr = "https://vault.blinkchamber.svc:8200"
+      cluster_addr = "https://vault.blinkchamber.svc:8201"
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+# ========================================
+# POSTGRESQL - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+postgresql-ha:
+  postgresql:
+    primary:
+      persistence:
+        enabled: true
+        size: 100Gi  # Tamaño grande para producción
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+    readReplicas:
+      replicaCount: 3  # Tres réplicas para máxima disponibilidad
+      persistence:
+        enabled: true
+        size: 100Gi
+      resources:
+        requests:
+          cpu: 1
+          memory: 2Gi
+        limits:
+          cpu: 2
+          memory: 4Gi
+    pgpool:
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+
+# ========================================
+# REDIS - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+redis:
+  architecture: replication
+  master:
+    persistence:
+      enabled: true
+      size: 50Gi  # Tamaño grande para producción
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+  replica:
+    replicaCount: 3  # Tres réplicas para máxima disponibilidad
+    persistence:
+      enabled: true
+      size: 50Gi
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+# ========================================
+# ZITADEL - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+zitadel:
+  zitadel:
+    replicaCount: 3  # Tres réplicas para máxima disponibilidad
+    resources:
+      requests:
+        cpu: 1
+        memory: 2Gi
+      limits:
+        cpu: 2
+        memory: 4Gi
+    persistence:
+      enabled: true
+      size: 50Gi  # Tamaño grande para producción
+
+# ========================================
+# NGINX-INGRESS - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+ingress-nginx:
+  controller:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+
+# ========================================
+# CERT-MANAGER - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+cert-manager:
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+
+
+
+
+# ========================================
+# MAILU - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+mailu:
+  # Configuración específica para producción
+  hostnames:
+    - mail.blinkchamber.com
+  
+  domain: "blinkchamber.com"
+  
+  # Recursos optimizados para producción
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi 

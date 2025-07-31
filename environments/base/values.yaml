@@ -1,0 +1,237 @@
+# ========================================
+# CONFIGURACIÓN BASE - COMÚN PARA TODOS LOS ENTORNOS
+# ========================================
+global:
+  # Configuración de namespaces
+  namespaces:
+    infra: "infra"
+    vault: "blinkchamber"
+    database: "database"
+    identity: "identity"
+  
+  # Configuración de TLS
+  tls:
+    enabled: true
+    certManager:
+      enabled: true
+      clusterIssuer: "letsencrypt-prod"
+
+# ========================================
+# CERT-MANAGER - CONFIGURACIÓN BASE
+# ========================================
+cert-manager:
+  enabled: true
+  installCRDs: true
+  prometheus:
+    enabled: true
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# ========================================
+# NGINX-INGRESS - CONFIGURACIÓN BASE
+# ========================================
+ingress-nginx:
+  enabled: true
+  controller:
+    service:
+      type: NodePort
+    ingressClassResource:
+      name: nginx
+      default: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    config:
+      use-proxy-protocol: "false"
+      proxy-real-ip-cidr: "0.0.0.0/0"
+
+# ========================================
+# VAULT - CONFIGURACIÓN BASE
+# ========================================
+vault:
+  enabled: true
+  server:
+    ha:
+      enabled: true
+      replicas: 1  # Base: 1 replica, se sobrescribe por entorno
+    extraConfig: |
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        cluster_address = "0.0.0.0:8201"
+        tls_cert_file = "/vault/userconfig/tls/tls.crt"
+        tls_key_file  = "/vault/userconfig/tls/tls.key"
+        tls_disable   = false
+      }
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+      api_addr = "https://vault.blinkchamber.svc:8200"
+      cluster_addr = "https://vault.blinkchamber.svc:8201"
+    extraVolumes:
+      - type: secret
+        name: vault-tls
+        path: /vault/userconfig/tls
+    extraVolumeMounts:
+      - name: vault-tls
+        mountPath: /vault/userconfig/tls
+        readOnly: true
+  injector:
+    enabled: true
+  ui:
+    enabled: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
+# ========================================
+# POSTGRESQL - CONFIGURACIÓN BASE
+# ========================================
+postgresql-ha:
+  enabled: true
+  global:
+    postgresql:
+      auth:
+        postgresPassword: ""
+        database: "blinkchamber"
+  postgresql:
+    primary:
+      persistence:
+        enabled: true
+        size: 8Gi
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    readReplicas:
+      persistence:
+        enabled: true
+        size: 8Gi
+      resources:
+        requests:
+          cpu: 250m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    pgpool:
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+
+# ========================================
+# REDIS - CONFIGURACIÓN BASE
+# ========================================
+redis:
+  enabled: true
+  architecture: replication
+  auth:
+    enabled: true
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  replica:
+    replicaCount: 1  # Base: 1 replica, se sobrescribe por entorno
+    persistence:
+      enabled: true
+      size: 8Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ========================================
+# ZITADEL - CONFIGURACIÓN BASE
+# ========================================
+zitadel:
+  enabled: true
+  zitadel:
+    replicaCount: 1  # Base: 1 replica, se sobrescribe por entorno
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 10Gi
+
+
+
+
+
+# ========================================
+# MAILU - SISTEMA DE EMAIL COMPLETO
+# ========================================
+mailu:
+  enabled: true
+  
+  # Configuración básica
+  hostnames:
+    - mail.blinkchamber.local
+  
+  domain: "blinkchamber.local"
+  
+  # Configuración de secretos
+  secretKey: ""  # Se generará automáticamente
+  
+  # Configuración de zona horaria
+  timezone: "Europe/Madrid"
+  
+  # Cuenta inicial de administrador
+  initialAccount:
+    enabled: true
+    username: "admin"
+    domain: "blinkchamber.local"
+    password: ""  # Se generará automáticamente
+    mode: "create"
+  
+  # Configuración de base de datos
+  global:
+    database:
+      roundcube:
+        database: roundcube
+        username: roundcube
+        password: ""  # Se configurará desde Vault
+  
+  # Configuración de recursos
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi 

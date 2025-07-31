@@ -40,6 +40,12 @@ dependencies:
     version: 1.0.0
     repository: https://charts.zitadel.com
     condition: zitadel.enabled
+    
+  # Sistema de Email Completo
+  - name: mailu
+    version: 2.2.2
+    repository: https://mailu.github.io/helm-charts
+    condition: mailu.enabled
 
 keywords:
   - identity
@@ -51,6 +57,11 @@ keywords:
   - zitadel
   - postgresql
   - redis
+  - email
+  - mailu
+  - smtp
+  - imap
+  - webmail
 
 maintainers:
   - name: BlinkChamber Team

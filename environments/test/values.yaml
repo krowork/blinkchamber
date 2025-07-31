@@ -1,0 +1,157 @@
+# ========================================
+# ENTORNO DE TEST - RECURSOS MÍNIMOS
+# ========================================
+
+# Heredar configuración base
+import:
+  - ../base/values.yaml
+
+# ========================================
+# OVERRIDES ESPECÍFICOS PARA TEST
+# ========================================
+
+# Configuración global para test
+global:
+  environment: "test"
+  domain: "test.blinkchamber.local"
+  
+  # Configuración de TLS para test
+  tls:
+    enabled: false  # Sin TLS en test para facilitar debugging
+    certManager:
+      enabled: false
+
+# ========================================
+# VAULT - CONFIGURACIÓN PARA TEST
+# ========================================
+vault:
+  server:
+    ha:
+      replicas: 1  # Una sola instancia para test
+    extraConfig: |
+      listener "tcp" {
+        address = "0.0.0.0:8200"
+        cluster_address = "0.0.0.0:8201"
+        tls_disable = true  # Sin TLS en test
+      }
+      storage "raft" {
+        path    = "/vault/data"
+        node_id = "vault-0"
+      }
+      api_addr = "http://vault.blinkchamber.svc:8200"
+      cluster_addr = "http://vault.blinkchamber.svc:8201"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# ========================================
+# POSTGRESQL - CONFIGURACIÓN PARA TEST
+# ========================================
+postgresql-ha:
+  postgresql:
+    primary:
+      persistence:
+        enabled: false  # Sin persistencia en test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+    readReplicas:
+      replicaCount: 0  # Sin réplicas en test
+    pgpool:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+# ========================================
+# REDIS - CONFIGURACIÓN PARA TEST
+# ========================================
+redis:
+  architecture: standalone  # Sin replicación en test
+  master:
+    persistence:
+      enabled: false  # Sin persistencia en test
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  replica:
+    replicaCount: 0  # Sin réplicas en test
+
+# ========================================
+# ZITADEL - CONFIGURACIÓN PARA TEST
+# ========================================
+zitadel:
+  zitadel:
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    persistence:
+      enabled: false  # Sin persistencia en test
+
+# ========================================
+# NGINX-INGRESS - CONFIGURACIÓN PARA TEST
+# ========================================
+ingress-nginx:
+  controller:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ========================================
+# CERT-MANAGER - CONFIGURACIÓN PARA TEST
+# ========================================
+cert-manager:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+
+
+
+
+# ========================================
+# MAILU - CONFIGURACIÓN PARA TEST
+# ========================================
+mailu:
+  # Configuración específica para test
+  hostnames:
+    - mail.test.blinkchamber.local
+  
+  domain: "test.blinkchamber.local"
+  
+  # Recursos mínimos para test
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi 
