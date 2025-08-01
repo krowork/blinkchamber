@@ -1,0 +1,53 @@
+{{- if .Values.videoStorage.enabled }}
+---
+# PVC para videos subidos
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-uploads-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: video-storage
+    component: uploads
+spec:
+  accessModes:
+    - {{ .Values.videoStorage.volumes.uploads.accessMode }}
+  storageClassName: {{ .Values.videoStorage.volumes.uploads.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.videoStorage.volumes.uploads.size }}
+---
+# PVC para videos procesados
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-processed-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: video-storage
+    component: processed
+spec:
+  accessModes:
+    - {{ .Values.videoStorage.volumes.processed.accessMode }}
+  storageClassName: {{ .Values.videoStorage.volumes.processed.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.videoStorage.volumes.processed.size }}
+---
+# PVC para cache de transcodificación
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: video-cache-pvc
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: video-storage
+    component: cache
+spec:
+  accessModes:
+    - {{ .Values.videoStorage.volumes.cache.accessMode }}
+  storageClassName: {{ .Values.videoStorage.volumes.cache.storageClass }}
+  resources:
+    requests:
+      storage: {{ .Values.videoStorage.volumes.cache.size }}
+{{- end }} 

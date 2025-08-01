@@ -55,6 +55,40 @@ ingress-nginx:
       proxy-real-ip-cidr: "0.0.0.0/0"
 
 # ========================================
+# LONGHORN - STORAGE DISTRIBUIDO PARA VIDEOS
+# ========================================
+longhorn:
+  enabled: true
+  persistence:
+    defaultClass: true
+    defaultClassReplicaCount: 3
+  longhornManager:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  longhornDriver:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  longhornUI:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+# ========================================
 # VAULT - CONFIGURACIÓN BASE
 # ========================================
 vault:
@@ -112,6 +146,7 @@ postgresql-ha:
       persistence:
         enabled: true
         size: 8Gi
+        storageClass: "longhorn"
       resources:
         requests:
           cpu: 250m
@@ -123,6 +158,7 @@ postgresql-ha:
       persistence:
         enabled: true
         size: 8Gi
+        storageClass: "longhorn"
       resources:
         requests:
           cpu: 250m
@@ -151,6 +187,7 @@ redis:
     persistence:
       enabled: true
       size: 8Gi
+      storageClass: "longhorn"
     resources:
       requests:
         cpu: 100m
@@ -163,6 +200,7 @@ redis:
     persistence:
       enabled: true
       size: 8Gi
+      storageClass: "longhorn"
     resources:
       requests:
         cpu: 100m
@@ -188,6 +226,7 @@ zitadel:
     persistence:
       enabled: true
       size: 10Gi
+      storageClass: "longhorn"
 
 
 
@@ -235,3 +274,59 @@ mailu:
     limits:
       cpu: 500m
       memory: 1Gi 
+
+# ========================================
+# ALMACENAMIENTO DE VIDEOS - CONFIGURACIÓN ESPECÍFICA
+# ========================================
+videoStorage:
+  enabled: true
+  
+  # Configuración de Longhorn para videos
+  longhorn:
+    # StorageClass específico para videos con replicación
+    storageClass:
+      name: "longhorn-videos"
+      replicaCount: 3  # 3 réplicas para alta disponibilidad
+      numberOfReplicas: 3
+      staleReplicaTimeout: 2880  # 48 horas
+      fromBackup: ""
+      
+  # Configuración de volúmenes para videos
+  volumes:
+    # Volumen para videos subidos
+    uploads:
+      size: 100Gi  # Tamaño inicial, escalable
+      storageClass: "longhorn-videos"
+      accessMode: ReadWriteMany  # Múltiples pods pueden escribir
+      
+    # Volumen para videos procesados
+    processed:
+      size: 500Gi  # Más espacio para videos procesados
+      storageClass: "longhorn-videos"
+      accessMode: ReadWriteMany
+      
+    # Volumen para cache de transcodificación
+    cache:
+      size: 50Gi
+      storageClass: "longhorn-videos"
+      accessMode: ReadWriteMany
+      
+  # Configuración de recursos para procesamiento de videos
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+      
+  # Configuración de retención
+  retention:
+    days: 365  # Retener videos por 1 año
+    maxSize: "10Ti"  # Máximo 10TB de videos
+    
+  # Configuración de compresión
+  compression:
+    enabled: true
+    quality: "medium"  # balanced, high, low
+    format: "mp4"  # mp4, webm, avi 

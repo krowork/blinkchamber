@@ -1,0 +1,22 @@
+{{- if .Values.videoStorage.enabled }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.videoStorage.longhorn.storageClass.name }}
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "false"
+    longhorn.io/storage-class: "true"
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+parameters:
+  numberOfReplicas: "{{ .Values.videoStorage.longhorn.storageClass.numberOfReplicas }}"
+  staleReplicaTimeout: "{{ .Values.videoStorage.longhorn.storageClass.staleReplicaTimeout }}"
+  fromBackup: "{{ .Values.videoStorage.longhorn.storageClass.fromBackup }}"
+  fsType: "ext4"
+  dataLocality: "disabled"
+  nodeSelector: ""
+  diskSelector: ""
+  recurringJobSelector: ""
+{{- end }} 

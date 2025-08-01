@@ -52,6 +52,77 @@ vault:
       memory: 4Gi
 
 # ========================================
+# LONGHORN - CONFIGURACIÓN PARA PRODUCCIÓN
+# ========================================
+longhorn:
+  persistence:
+    defaultClass: true
+    defaultClassReplicaCount: 3
+  longhornManager:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+  longhornDriver:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 1
+        memory: 1Gi
+  longhornUI:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# ========================================
+# ALMACENAMIENTO DE VIDEOS - PRODUCCIÓN
+# ========================================
+videoStorage:
+  longhorn:
+    storageClass:
+      name: "longhorn-videos"
+      replicaCount: 3
+      numberOfReplicas: 3
+      staleReplicaTimeout: 2880
+  volumes:
+    uploads:
+      size: 1Ti  # 1TB para videos subidos
+      storageClass: "longhorn-videos"
+      accessMode: ReadWriteMany
+    processed:
+      size: 5Ti  # 5TB para videos procesados
+      storageClass: "longhorn-videos"
+      accessMode: ReadWriteMany
+    cache:
+      size: 500Gi  # 500GB para cache
+      storageClass: "longhorn-videos"
+      accessMode: ReadWriteMany
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      cpu: 8
+      memory: 16Gi
+  retention:
+    days: 1095  # 3 años
+    maxSize: "50Ti"  # 50TB máximo
+  compression:
+    enabled: true
+    quality: "high"
+    format: "mp4"
+
+# ========================================
 # POSTGRESQL - CONFIGURACIÓN PARA PRODUCCIÓN
 # ========================================
 postgresql-ha:

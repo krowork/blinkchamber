@@ -1,4 +1,51 @@
-# 🚀 BlinkChamber Platform - Arquitectura de Alta Disponibilidad
+# BlinkChamber Platform
+
+Plataforma completa de alta disponibilidad con ZITADEL, Vault, PostgreSQL, Redis y sistema de almacenamiento distribuido para videos.
+
+## Características Principales
+
+- **Identidad y Autenticación**: ZITADEL para gestión completa de identidades
+- **Gestión de Secretos**: HashiCorp Vault con inyección automática
+- **Base de Datos**: PostgreSQL HA con replicación
+- **Cache**: Redis con arquitectura de replicación
+- **Email**: Sistema completo Mailu con SMTP/IMAP
+- **Storage Distribuido**: Longhorn para almacenamiento de videos
+- **Ingress**: NGINX Ingress Controller
+- **Certificados**: Cert-Manager para TLS automático
+
+## Almacenamiento de Videos con Longhorn
+
+### ¿Por qué Longhorn?
+
+Para el almacenamiento de gran cantidad de videos de 2 minutos, Longhorn proporciona:
+
+- **Almacenamiento distribuido**: Los videos se replican automáticamente entre nodos
+- **Alta disponibilidad**: 3 réplicas por defecto para máxima redundancia
+- **Escalabilidad**: Volúmenes que pueden expandirse dinámicamente
+- **Sin dependencias externas**: Funciona completamente on-premise
+- **Gestión visual**: UI integrada para monitoreo de volúmenes
+
+### Configuración de Volúmenes
+
+El sistema crea automáticamente 3 tipos de volúmenes:
+
+1. **video-uploads-pvc**: Para videos recién subidos (100Gi - 1Ti)
+2. **video-processed-pvc**: Para videos procesados (500Gi - 5Ti)
+3. **video-cache-pvc**: Para cache de transcodificación (50Gi - 500Gi)
+
+### Estimación de Capacidad
+
+Para videos de 2 minutos:
+- **Calidad estándar (720p)**: ~50MB por video
+- **Calidad alta (1080p)**: ~150MB por video
+- **Calidad ultra (4K)**: ~500MB por video
+
+Con 1TB de almacenamiento puedes almacenar:
+- ~20,000 videos en 720p
+- ~6,600 videos en 1080p
+- ~2,000 videos en 4K
+
+## Arquitectura
 
 Este proyecto contiene un **chart umbrella de Helm** que despliega una arquitectura completa de alta disponibilidad con ZITADEL, HashiCorp Vault y PostgreSQL en Kubernetes, con gestión segura de secretos mediante Vault Injector.
 
