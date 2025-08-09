@@ -1,6 +1,8 @@
-# CI/CD Pipeline para BlinkChamber
+# 🔄 Pipeline de CI/CD
 
-Esta documentación describe la configuración completa de CI/CD para múltiples entornos usando GitOps con ArgoCD, Tekton y Helmfile.
+## 📋 Resumen
+
+Esta documentación describe la configuración completa de CI/CD para múltiples entornos usando GitOps con ArgoCD, Tekton y Helmfile. El pipeline proporciona automatización completa desde el desarrollo hasta la producción.
 
 ## 🏗️ Arquitectura de CI/CD
 
@@ -69,7 +71,7 @@ blinkchamber/
 │   └── triggers/             # Configuración de triggers
 ├── scripts/                  # Scripts de automatización
 ├── helmfile.yaml             # Configuración principal de Helmfile
-└── CI-CD-README.md           # Esta documentación
+└── docs/                     # Documentación
 ```
 
 ## 🚀 Flujo de CI/CD
@@ -396,6 +398,126 @@ autoscaling:
    kubectl describe resourcequota -n blinkchamber-test
    ```
 
+### **Comandos de Diagnóstico**
+```bash
+# Verificar estado general
+kubectl get pods,svc,ingress -A -l app.kubernetes.io/part-of=blinkchamber-platform
+
+# Verificar eventos
+kubectl get events -A --sort-by='.lastTimestamp'
+
+# Verificar logs de ArgoCD
+kubectl logs -n argocd deployment/argocd-server
+
+# Verificar logs de Tekton
+kubectl logs -n tekton-pipelines deployment/tekton-pipelines-controller
+```
+
+## 📋 Configuración de ArgoCD
+
+### **Aplicación de ArgoCD**
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: blinkchamber-test
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/blinkchamber/platform.git
+    targetRevision: HEAD
+    path: environments/test
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: blinkchamber-test
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+```
+
+### **Proyecto de ArgoCD**
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: blinkchamber
+  namespace: argocd
+spec:
+  description: BlinkChamber Platform
+  sourceRepos:
+    - 'https://github.com/blinkchamber/platform.git'
+  destinations:
+    - namespace: blinkchamber-*
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: ConfigMap
+    - group: ''
+      kind: Secret
+    - group: ''
+      kind: Service
+    - group: ''
+      kind: Deployment
+```
+
+## 📋 Configuración de Tekton
+
+### **Pipeline de Tekton**
+```yaml
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: blinkchamber-pipeline
+spec:
+  params:
+    - name: git-url
+    - name: git-revision
+    - name: environment
+  tasks:
+    - name: fetch-repository
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+    - name: run-tests
+      runAfter: ["fetch-repository"]
+      taskRef:
+        name: bats-test
+      params:
+        - name: test-path
+          value: "tests/"
+    - name: build-image
+      runAfter: ["run-tests"]
+      taskRef:
+        name: kaniko
+      params:
+        - name: IMAGE
+          value: "registry.example.com/blinkchamber:$(params.git-revision)"
+    - name: deploy
+      runAfter: ["build-image"]
+      taskRef:
+        name: helm-upgrade-from-source
+      params:
+        - name: release_name
+          value: "blinkchamber-$(params.environment)"
+        - name: namespace
+          value: "blinkchamber-$(params.environment)"
+```
+
 ## 📚 Recursos Adicionales
 
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
@@ -417,4 +539,4 @@ Para contribuir al pipeline de CI/CD:
 
 ---
 
-**Nota**: Este pipeline está diseñado para mantener la seguridad y estabilidad de la plataforma BlinkChamber siguiendo las mejores prácticas de GitOps y DevOps. 
+**Nota**: Este pipeline está diseñado para mantener la seguridad y estabilidad de la plataforma BlinkChamber siguiendo las mejores prácticas de GitOps y DevOps.

@@ -2,7 +2,7 @@
 
 ## 📋 Resumen
 
-Esta documentación describe la integración de Redis con ZITADEL en la plataforma BlinkChamber. Redis se utiliza como sistema de cache y almacenamiento de sesiones para mejorar el rendimiento y la escalabilidad de ZITADEL.
+Esta documentación describe la integración completa de Redis con ZITADEL en la plataforma BlinkChamber. Redis se utiliza como sistema de cache, almacenamiento de sesiones y event streaming para mejorar el rendimiento y la escalabilidad de ZITADEL.
 
 ## 🎯 Propósito de Redis en ZITADEL
 
@@ -57,6 +57,30 @@ podAnnotations:
   vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
 ```
 
+### 🏗️ Estructura de Alta Disponibilidad
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Redis Cluster                           │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │   Master    │  │   Master    │  │   Master    │        │
+│  │   Node 1    │  │   Node 2    │  │   Node 3    │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+│         │                │                │               │
+│         ▼                ▼                ▼               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  Replica    │  │  Replica    │  │  Replica    │        │
+│  │   Node 1    │  │   Node 2    │  │   Node 3    │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+│                                                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │  Sentinel   │  │  Sentinel   │  │  Sentinel   │        │
+│  │   Node 1    │  │   Node 2    │  │   Node 3    │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+└─────────────────────────────────────────────────────────────┘
+```
+
 ## 🔧 Configuración de ZITADEL con Redis
 
 ### 📝 Configuración de Cache
@@ -79,7 +103,6 @@ zitadel:
         writeTimeout: 3s
         poolTimeout: 4s
         idleTimeout: 5m
-        maxConnAge: 30m
 ```
 
 ### 🔑 Parámetros de Configuración
@@ -100,7 +123,7 @@ zitadel:
 
 ## 🚀 Event Streaming con Redis
 
-### Configuración recomendada en values.yaml
+### Configuración Completa
 
 ```yaml
 zitadel:
@@ -182,144 +205,21 @@ zitadel:
         enableMetrics: true
 ```
 
-### Beneficios
-- Publicación eficiente de eventos en lotes (batch)
-- Uso de colas de prioridad para distintos tipos de eventos
-- Pool de conexiones dedicado para eventos
-- Métricas y monitorización integradas
-- Separación de base de datos Redis para eventos y cache
+### 🎯 Tipos de Eventos
 
-### Comandos útiles
+#### High Priority Events
+- `auth.login` - Inicio de sesión exitoso
+- `auth.logout` - Cierre de sesión
+- `auth.failed` - Intento de autenticación fallido
+- `auth.password_changed` - Cambio de contraseña
+- `auth.mfa_enabled` - Activación de MFA
 
-```bash
-# Ver eventos en colas
-kubectl exec -n database redis-master-0 -- redis-cli LRANGE zitadel:events:high 0 -1
-
-# Ver métricas de eventos
-kubectl exec -n identity zitadel-0 -- curl -s localhost:8080/metrics | grep event
-
-# Monitorizar rendimiento
-kubectl exec -n database redis-master-0 -- redis-cli info stats
-```
-
-## 🚀 Beneficios de la Integración
-
-### ⚡ Rendimiento Mejorado
-- **Reducción de latencia**: Cache local reduce tiempo de respuesta
-- **Menos carga en BD**: Consultas frecuentes se sirven desde cache
-- **Escalabilidad**: Múltiples instancias comparten cache
-
-### 🔒 Seguridad
-- **Gestión segura de secretos**: Contraseñas gestionadas por Vault
-- **Aislamiento**: Redis en namespace separado
-- **Encriptación**: Comunicación TLS entre servicios
-
-### 📈 Alta Disponibilidad
-- **Replicación**: 3 master + 3 réplicas + 3 Sentinel
-- **Failover automático**: Sentinel gestiona conmutación por error
-- **Persistencia**: Datos persistentes en volúmenes
-
-## 🔍 Monitorización
-
-### 📊 Métricas de Redis
-
-```bash
-# Ver estado de Redis
-kubectl get pods -n database -l app.kubernetes.io/name=redis
-
-# Logs de Redis master
-kubectl logs -n database redis-master-0
-
-# Logs de Sentinel
-kubectl logs -n database redis-sentinel-0
-```
-
-### 📈 Métricas de ZITADEL con Redis
-
-```bash
-# Ver logs de ZITADEL con Redis
-kubectl logs -n identity -l app.kubernetes.io/name=zitadel | grep -i redis
-
-# Verificar conexión a Redis
-kubectl exec -n identity zitadel-0 -- curl -s localhost:8080/healthz
-```
-
-## 🛠️ Troubleshooting
-
-### ❌ Problemas Comunes
-
-#### 1. ZITADEL no puede conectar a Redis
-```bash
-# Verificar que Redis esté corriendo
-kubectl get pods -n database -l app.kubernetes.io/name=redis
-
-# Verificar secretos de Vault
-kubectl exec -n blinkchamber vault-0 -- vault kv get secret/data/redis
-
-# Verificar conectividad de red
-kubectl exec -n identity zitadel-0 -- nc -zv redis-master.database.svc.cluster.local 6379
-```
-
-#### 2. Redis no puede obtener contraseña de Vault
-```bash
-# Verificar que Vault esté desellado
-kubectl exec -n blinkchamber vault-0 -- vault status
-
-# Verificar policies de Redis
-kubectl exec -n blinkchamber vault-0 -- vault policy read redis-policy
-
-# Verificar roles de Kubernetes
-kubectl exec -n blinkchamber vault-0 -- vault read auth/kubernetes/role/redis-role
-```
-
-#### 3. Bajo rendimiento de cache
-```bash
-# Verificar uso de memoria de Redis
-kubectl exec -n database redis-master-0 -- redis-cli info memory
-
-# Verificar estadísticas de cache
-kubectl exec -n database redis-master-0 -- redis-cli info stats
-
-# Verificar conexiones activas
-kubectl exec -n database redis-master-0 -- redis-cli info clients
-```
-
-### 🔧 Soluciones
-
-#### 1. Reiniciar Redis
-```bash
-kubectl delete pod -n database redis-master-0
-kubectl delete pod -n database redis-replica-0
-```
-
-#### 2. Limpiar cache de Redis
-```bash
-kubectl exec -n database redis-master-0 -- redis-cli flushall
-```
-
-#### 3. Verificar configuración de ZITADEL
-```bash
-kubectl get configmap -n identity zitadel-config -o yaml
-```
-
-## 📚 Referencias
-
-- [Documentación oficial de ZITADEL](https://zitadel.com/docs)
-- [Redis en Kubernetes](https://redis.io/docs/stack/get-started/tutorials/redis-kubernetes/)
-- [Vault Injector](https://www.vaultproject.io/docs/platform/k8s/injector)
-- [Bitnami Redis Chart](https://github.com/bitnami/charts/tree/main/bitnami/redis)
-
-## 🤝 Contribuir
-
-Para contribuir a la integración de Redis con ZITADEL:
-
-1. Fork el repositorio
-2. Crea una rama para tu feature
-3. Implementa los cambios
-4. Añade tests
-5. Documenta los cambios
-6. Abre un Pull Request
-
----
-
-**🎉 ¡Disfruta de tu plataforma con cache de alta disponibilidad!** 
+#### Normal Priority Events
+- `user.created` - Creación de usuario
+- `user.updated` - Actualización de usuario
+- `user.deleted` - Eliminación de usuario
+- `org.created` - Creación de organización
+- `org.updated` - Actualización de organización
+- `org.deleted` - Eliminación de organización
+- `project.created` - Creación de proyecto
+- `

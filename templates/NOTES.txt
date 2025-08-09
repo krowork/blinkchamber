@@ -1,0 +1,67 @@
+===========================================
+🎉 BLINKCHAMBER PLATFORM DESPLEGADA
+===========================================
+
+📋 COMPONENTES INSTALADOS:
+✅ Cert-Manager
+✅ Nginx-Ingress  
+✅ Vault HA
+✅ PostgreSQL HA
+✅ Redis HA
+✅ ZITADEL
+✅ Stack de Observabilidad (Prometheus, Grafana, Loki)
+
+🔐 CONFIGURACIÓN INICIAL:
+
+1. Configurar Vault y secretos:
+   ./deploy.sh setup
+
+2. Solucionar problemas automáticamente:
+   ./deploy.sh fix
+
+3. Reiniciar pods problemáticos:
+   ./deploy.sh restart
+
+4. Ver estado de la plataforma:
+   ./deploy.sh status
+
+🌐 ACCESO A SERVICIOS:
+
+- Vault UI: https://vault.blinkchamber.svc:8200
+- ZITADEL: https://zitadel.tu-dominio.com
+- PostgreSQL: postgresql-ha-postgresql.database.svc:5432
+- Redis: redis-master.database.svc:6379
+- Grafana: http://grafana.monitoring.svc:3000
+
+📊 MONITORIZACIÓN:
+
+Para ver el estado:
+./deploy.sh status
+
+Para ver logs:
+./deploy.sh logs
+
+Para gestión avanzada:
+./manage.sh --help
+
+🔧 COMANDOS ÚTILES:
+
+# Configuración inicial completa
+./deploy.sh setup
+
+# Solucionar problemas
+./deploy.sh fix
+
+# Reiniciar pods problemáticos  
+./deploy.sh restart
+
+# Gestión de secretos
+./manage.sh secrets list
+./manage.sh secrets verify
+
+# Gestión de pods
+./manage.sh pods status
+./manage.sh pods restart-all
+
+📚 DOCUMENTACIÓN:
+Consulta el README.md para más detalles. 

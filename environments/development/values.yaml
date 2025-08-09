@@ -15,12 +15,11 @@ global:
   environment: "development"
   domain: "dev.blinkchamber.local"
   
-  # Configuración de TLS para desarrollo
+  # Configuración de TLS para desarrollo (DESHABILITADO para desarrollo local)
   tls:
-    enabled: true
+    enabled: false
     certManager:
-      enabled: true
-      clusterIssuer: "letsencrypt-staging"  # Certificados de staging
+      enabled: false
 
 # ========================================
 # VAULT - CONFIGURACIÓN PARA DESARROLLO
@@ -33,16 +32,14 @@ vault:
       listener "tcp" {
         address = "0.0.0.0:8200"
         cluster_address = "0.0.0.0:8201"
-        tls_cert_file = "/vault/userconfig/tls/tls.crt"
-        tls_key_file  = "/vault/userconfig/tls/tls.key"
-        tls_disable   = false
+        tls_disable = true  # Sin TLS para desarrollo local
       }
       storage "raft" {
         path    = "/vault/data"
         node_id = "vault-0"
       }
-      api_addr = "https://vault.blinkchamber.svc:8200"
-      cluster_addr = "https://vault.blinkchamber.svc:8201"
+      api_addr = "http://vault.blinkchamber.svc:8200"
+      cluster_addr = "http://vault.blinkchamber.svc:8201"
   resources:
     requests:
       cpu: 200m
@@ -121,7 +118,27 @@ redis:
 # ZITADEL - CONFIGURACIÓN PARA DESARROLLO
 # ========================================
 zitadel:
+  ingress:
+    hosts:
+      - host: zitadel.dev.blinkchamber.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+  
   zitadel:
+    env:
+      - name: ZITADEL_EXTERNALDOMAIN
+        value: "zitadel.dev.blinkchamber.local"
+      - name: ZITADEL_EXTERNALSECURE
+        value: "false"  # HTTP para desarrollo local
+    
+    args:
+      - "start-from-init"
+      - "--masterkeyFile"
+      - "/vault/secrets/masterkey"
+      - "--tlsMode"
+      - "disabled"  # Sin TLS para desarrollo local
+    
     replicaCount: 1
     resources:
       requests:

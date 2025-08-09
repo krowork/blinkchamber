@@ -96,7 +96,27 @@ redis:
 # ZITADEL - CONFIGURACIÓN PARA TEST
 # ========================================
 zitadel:
+  ingress:
+    hosts:
+      - host: zitadel.test.blinkchamber.local
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+  
   zitadel:
+    env:
+      - name: ZITADEL_EXTERNALDOMAIN
+        value: "zitadel.test.blinkchamber.local"
+      - name: ZITADEL_EXTERNALSECURE
+        value: "false"  # HTTP para test
+    
+    args:
+      - "start-from-init"
+      - "--masterkeyFile"
+      - "/vault/secrets/masterkey"
+      - "--tlsMode"
+      - "disabled"  # Sin TLS para test
+    
     replicaCount: 1
     resources:
       requests:

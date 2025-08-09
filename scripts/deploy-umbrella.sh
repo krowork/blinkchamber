@@ -23,12 +23,19 @@ show_help() {
   echo "  uninstall   - Desinstalar la plataforma"
   echo "  status      - Ver estado de la plataforma"
   echo "  logs        - Ver logs de todos los componentes"
+  echo "  setup       - Configuración inicial completa (Vault + secretos)"
+  echo "  fix         - Solucionar problemas automáticamente"
+  echo "  restart     - Reiniciar pods problemáticos"
   echo "  help        - Mostrar esta ayuda"
   echo ""
   echo "Ejemplos:"
   echo "  $0 install"
-  echo "  $0 upgrade"
+  echo "  $0 setup      # Configurar Vault y crear secretos"
+  echo "  $0 fix        # Solucionar problemas automáticamente"
+  echo "  $0 restart    # Reiniciar pods problemáticos"
   echo "  $0 status"
+  echo ""
+  echo "💡 Para gestión avanzada usar: ./scripts/manage-platform.sh"
 }
 
 add_repositories() {
@@ -148,6 +155,46 @@ show_logs() {
 }
 
 # =====================
+# NUEVAS FUNCIONES
+# =====================
+setup_platform() {
+  echo "🔧 Configuración inicial de la plataforma..."
+  
+  if [ ! -f "scripts/manage-platform.sh" ]; then
+    echo "❌ Error: scripts/manage-platform.sh no encontrado"
+    exit 1
+  fi
+  
+  echo "📋 Ejecutando configuración inicial..."
+  ./scripts/manage-platform.sh vault setup-auth
+  ./scripts/manage-platform.sh secrets create-all
+  
+  echo "✅ Configuración inicial completada!"
+}
+
+fix_platform() {
+  echo "🔧 Solucionando problemas de la plataforma..."
+  
+  if [ ! -f "scripts/manage-platform.sh" ]; then
+    echo "❌ Error: scripts/manage-platform.sh no encontrado"
+    exit 1
+  fi
+  
+  ./scripts/manage-platform.sh platform fix-issues
+}
+
+restart_pods() {
+  echo "🔄 Reiniciando pods problemáticos..."
+  
+  if [ ! -f "scripts/manage-platform.sh" ]; then
+    echo "❌ Error: scripts/manage-platform.sh no encontrado"
+    exit 1
+  fi
+  
+  ./scripts/manage-platform.sh pods restart-all
+}
+
+# =====================
 # MENÚ PRINCIPAL
 # =====================
 case "${1:-help}" in
@@ -165,6 +212,15 @@ case "${1:-help}" in
     ;;
   logs)
     show_logs
+    ;;
+  setup)
+    setup_platform
+    ;;
+  fix)
+    fix_platform
+    ;;
+  restart)
+    restart_pods
     ;;
   help|--help|-h)
     show_help

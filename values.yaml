@@ -180,9 +180,9 @@ redis:
       vault.hashicorp.com/role: "redis-role"
       vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
       vault.hashicorp.com/agent-inject-template-REDIS_PASSWORD: |
-        {{- with secret "secret/data/redis" -}}
+        {{`{{- with secret "secret/data/redis" -}}
         {{ .Data.data.password }}
-        {{- end }}
+        {{- end }}`}}
     extraEnvVars:
       - name: REDIS_PASSWORD_FILE
         value: "/vault/secrets/REDIS_PASSWORD"
@@ -209,9 +209,9 @@ redis:
       vault.hashicorp.com/role: "redis-role"
       vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
       vault.hashicorp.com/agent-inject-template-REDIS_PASSWORD: |
-        {{- with secret "secret/data/redis" -}}
+        {{`{{- with secret "secret/data/redis" -}}
         {{ .Data.data.password }}
-        {{- end }}
+        {{- end }}`}}
     extraEnvVars:
       - name: REDIS_PASSWORD_FILE
         value: "/vault/secrets/REDIS_PASSWORD"
@@ -247,7 +247,27 @@ redis:
 # ========================================
 zitadel:
   enabled: true
+  
+  # Configuración principal de ZITADEL
   replicaCount: 2
+  
+  # Masterkey se inyecta via Vault (no usar masterkeySecretName)
+  
+  # Anotaciones del pod para Vault injection
+  podAnnotations:
+    vault.hashicorp.com/agent-inject: "true"
+    vault.hashicorp.com/role: "blinkchamber-role"
+    vault.hashicorp.com/agent-inject-secret-masterkey: "secret/data/zitadel/config"
+    vault.hashicorp.com/agent-inject-template-masterkey: |
+      {{`{{- with secret "secret/data/zitadel/config" -}}
+      {{ .Data.data.masterkey }}
+      {{- end }}`}}
+    vault.hashicorp.com/agent-inject-secret-db-password: "secret/data/zitadel/postgres"
+    vault.hashicorp.com/agent-inject-template-db-password: |
+      {{`{{- with secret "secret/data/zitadel/postgres" -}}
+      {{ .Data.data.password }}
+      {{- end }}`}}
+  
   service:
     type: ClusterIP
     port: 8080
@@ -261,34 +281,43 @@ zitadel:
             pathType: ImplementationSpecific
     tls: []
 
-  podAnnotations:
-    vault.hashicorp.com/agent-inject: "true"
-    vault.hashicorp.com/role: "zitadel-role"
-    vault.hashicorp.com/agent-inject-secret-ZITADEL_DB_PASSWORD: "secret/data/zitadel/postgres#password"
-    vault.hashicorp.com/agent-inject-template-ZITADEL_DB_PASSWORD: |
-      {{- with secret "secret/data/zitadel/postgres" -}}
-      {{ .Data.data.password }}
-      {{- end }}
-    vault.hashicorp.com/agent-inject-secret-VAULT_TOKEN: "secret/data/zitadel/vault#token"
-    vault.hashicorp.com/agent-inject-template-VAULT_TOKEN: |
-      {{- with secret "secret/data/zitadel/vault" -}}
-      {{ .Data.data.token }}
-      {{- end }}
-    vault.hashicorp.com/agent-inject-secret-REDIS_PASSWORD: "secret/data/redis#password"
-    vault.hashicorp.com/agent-inject-template-REDIS_PASSWORD: |
-      {{- with secret "secret/data/redis" -}}
-      {{ .Data.data.password }}
-      {{- end }}
-    vault.hashicorp.com/agent-inject-secret-SMTP_USER: "secret/data/mailu#admin_username"
-    vault.hashicorp.com/agent-inject-template-SMTP_USER: |
-      {{- with secret "secret/data/mailu" -}}
-      {{ .Data.data.admin_username }}
-      {{- end }}
-    vault.hashicorp.com/agent-inject-secret-SMTP_PASSWORD: "secret/data/mailu#admin_password"
-    vault.hashicorp.com/agent-inject-template-SMTP_PASSWORD: |
-      {{- with secret "secret/data/mailu" -}}
-      {{ .Data.data.admin_password }}
-      {{- end }}
+  # Configuración específica de ZITADEL
+  zitadel:
+    # Comando y argumentos para inicialización
+    command: ["zitadel"]
+    args: 
+      - "start-from-init"
+      - "--masterkey-from-file"
+      - "/vault/secrets/masterkey"
+      - "--tlsMode"
+      - "disabled"
+    
+    # Variables de entorno para configuración
+    env:
+      - name: ZITADEL_LOG_LEVEL
+        value: "info"
+      - name: ZITADEL_DATABASE_POSTGRES_HOST
+        value: "postgres.database.svc.cluster.local"
+      - name: ZITADEL_DATABASE_POSTGRES_PORT
+        value: "5432"
+      - name: ZITADEL_DATABASE_POSTGRES_DATABASE
+        value: "zitadel"
+      - name: ZITADEL_DATABASE_POSTGRES_USER_USERNAME
+        value: "zitadel"
+      - name: ZITADEL_DATABASE_POSTGRES_USER_PASSWORD_FILE
+        value: "/vault/secrets/db-password"
+      - name: ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE
+        value: "disable"
+      - name: ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME
+        value: "zitadel"
+      - name: ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD_FILE
+        value: "/vault/secrets/db-password"
+      - name: ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE
+        value: "disable"
+      - name: ZITADEL_EXTERNALSECURE
+        value: "false"
+      - name: ZITADEL_EXTERNALDOMAIN
+        value: "zitadel.blinkchamber.local"
 
   config:
     database:
@@ -414,3 +443,471 @@ zitadel:
     minReplicas: 2
     maxReplicas: 5
     targetCPUUtilizationPercentage: 80 
+
+# ========================================
+# STACK DE OBSERVABILIDAD
+# ========================================
+monitoring:
+  
+  # ========================================
+  # PROMETHEUS
+  # ========================================
+  prometheus:
+    enabled: true
+    alertmanager:
+      enabled: true
+      persistentVolume:
+        enabled: true
+        size: 10Gi
+        storageClass: longhorn
+    server:
+      persistentVolume:
+        enabled: true
+        size: 50Gi
+        storageClass: longhorn
+      retention: 30d
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1
+          memory: 2Gi
+    pushgateway:
+      enabled: true
+      persistentVolume:
+        enabled: true
+        size: 5Gi
+        storageClass: longhorn
+    configmapReload:
+      enabled: true
+    kubeStateMetrics:
+      enabled: true
+    nodeExporter:
+      enabled: true
+    serverFiles:
+      alerts:
+        groups:
+          - name: blinkchamber
+            rules:
+              - alert: VaultUnsealed
+                expr: vault_core_unsealed == 0
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "Vault is sealed"
+                  description: "Vault instance {{ $labels.instance }} is sealed"
+              
+              - alert: PostgreSQLDown
+                expr: postgresql_up == 0
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "PostgreSQL is down"
+                  description: "PostgreSQL instance {{ $labels.instance }} is down"
+              
+              - alert: RedisDown
+                expr: redis_up == 0
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "Redis is down"
+                  description: "Redis instance {{ $labels.instance }} is down"
+              
+              - alert: ZitadelDown
+                expr: zitadel_up == 0
+                for: 1m
+                labels:
+                  severity: critical
+                annotations:
+                  summary: "ZITADEL is down"
+                  description: "ZITADEL instance {{ $labels.instance }} is down"
+              
+              - alert: HighCPUUsage
+                expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+                for: 5m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "High CPU usage"
+                  description: "CPU usage is above 80% on {{ $labels.instance }}"
+              
+              - alert: HighMemoryUsage
+                expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+                for: 5m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "High memory usage"
+                  description: "Memory usage is above 85% on {{ $labels.instance }}"
+              
+              - alert: DiskSpaceLow
+                expr: (node_filesystem_avail_bytes{mountpoint="/"} * 100) / node_filesystem_size_bytes{mountpoint="/"} < 10
+                for: 5m
+                labels:
+                  severity: warning
+                annotations:
+                  summary: "Low disk space"
+                  description: "Disk space is below 10% on {{ $labels.instance }}"
+
+  # ========================================
+  # GRAFANA
+  # ========================================
+  grafana:
+    enabled: true
+    adminPassword: "admin123"  # Cambiar en producción
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: longhorn
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: 'blinkchamber'
+            orgId: 1
+            folder: ''
+            type: file
+            disableDeletion: false
+            editable: true
+            options:
+              path: /var/lib/grafana/dashboards/blinkchamber
+    dashboards:
+      blinkchamber:
+        vault-dashboard:
+          json: |
+            {
+              "dashboard": {
+                "id": null,
+                "title": "Vault Dashboard",
+                "tags": ["vault", "blinkchamber"],
+                "timezone": "browser",
+                "panels": [
+                  {
+                    "id": 1,
+                    "title": "Vault Status",
+                    "type": "stat",
+                    "targets": [
+                      {
+                        "expr": "vault_core_unsealed",
+                        "legendFormat": "Vault Unsealed"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+        postgresql-dashboard:
+          json: |
+            {
+              "dashboard": {
+                "id": null,
+                "title": "PostgreSQL Dashboard",
+                "tags": ["postgresql", "blinkchamber"],
+                "timezone": "browser",
+                "panels": [
+                  {
+                    "id": 1,
+                    "title": "PostgreSQL Connections",
+                    "type": "graph",
+                    "targets": [
+                      {
+                        "expr": "postgresql_connections_active",
+                        "legendFormat": "Active Connections"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+        redis-dashboard:
+          json: |
+            {
+              "dashboard": {
+                "id": null,
+                "title": "Redis Dashboard",
+                "tags": ["redis", "blinkchamber"],
+                "timezone": "browser",
+                "panels": [
+                  {
+                    "id": 1,
+                    "title": "Redis Memory Usage",
+                    "type": "graph",
+                    "targets": [
+                      {
+                        "expr": "redis_memory_used_bytes",
+                        "legendFormat": "Memory Used"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: http://prometheus-server
+            access: proxy
+            isDefault: true
+          - name: Loki
+            type: loki
+            url: http://loki:3100
+            access: proxy
+
+  # ========================================
+  # LOKI - LOGS CENTRALIZADOS
+  # ========================================
+  loki:
+    enabled: true
+    loki:
+      auth_enabled: false
+      commonConfig:
+        path_prefix: /var/loki
+        replication_factor: 1
+      storage:
+        type: filesystem
+        filesystem:
+          chunks_directory: /var/loki/chunks
+          rules_directory: /var/loki/rules
+      schema_config:
+        configs:
+          - from: 2020-10-24
+            store: boltdb-shipper
+            object_store: filesystem
+            schema: v11
+            index:
+              prefix: index_
+              period: 24h
+      ruler:
+        alertmanager_url: http://prometheus-alertmanager
+      limits_config:
+        enforce_metric_name: false
+        reject_old_samples: true
+        reject_old_samples_max_age: 168h
+      chunk_store_config:
+        max_look_back_period: 0s
+      table_manager:
+        retention_deletes_enabled: false
+        retention_period: 0s
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: longhorn
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # ========================================
+  # PROMTAIL - RECOLECCIÓN DE LOGS
+  # ========================================
+  promtail:
+    enabled: true
+    config:
+      server:
+        http_listen_port: 9080
+        grpc_listen_port: 0
+      positions:
+        filename: /tmp/positions.yaml
+      clients:
+        - url: http://loki:3100/loki/api/v1/push
+      scrape_configs:
+        - job_name: kubernetes-pods-name
+          pipeline_stages:
+            - docker: {}
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels:
+                - __meta_kubernetes_pod_label_app
+              target_label: app
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_name
+              target_label: app
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_pod_namespace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_container_name
+              target_label: container
+            - source_labels:
+                - __meta_kubernetes_pod_name
+                - __meta_kubernetes_pod_container_name
+                - __meta_kubernetes_pod_container_port_name
+              action: replace
+              regex: (.+);(.+);(.+)
+              replacement: $1:$2:$3
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - source_labels:
+                - __meta_kubernetes_namespace
+              action: replace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              action: replace
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_pod_container_name
+              action: replace
+              target_label: container
+            - replacement: /var/log/pods/*$1/*.log
+              separator: /
+              source_labels:
+                - __meta_kubernetes_pod_uid
+                - __meta_kubernetes_pod_container_name
+              target_label: __path__
+        - job_name: kubernetes-pods-app
+          pipeline_stages:
+            - docker: {}
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_app_kubernetes_io_(.+)
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_name
+              action: replace
+              target_label: app
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_pod_namespace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_container_name
+              target_label: container
+            - replacement: /var/log/pods/*$1/*.log
+              separator: /
+              source_labels:
+                - __meta_kubernetes_pod_uid
+                - __meta_kubernetes_pod_container_name
+              target_label: __path__
+        - job_name: kubernetes-pods-direct-controllers
+          pipeline_stages:
+            - docker: {}
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_name
+              action: drop
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_label_app
+              action: drop
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_controller_name
+              action: replace
+              target_label: app
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_pod_namespace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_container_name
+              target_label: container
+            - replacement: /var/log/pods/*$1/*.log
+              separator: /
+              source_labels:
+                - __meta_kubernetes_pod_uid
+                - __meta_kubernetes_pod_container_name
+              target_label: __path__
+        - job_name: kubernetes-pods-indirect-controller
+          pipeline_stages:
+            - docker: {}
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_name
+              action: drop
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_label_app
+              action: drop
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_controller_name
+              regex: .*[^/]
+              action: replace
+              target_label: app
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_pod_namespace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_container_name
+              target_label: container
+            - replacement: /var/log/pods/*$1/*.log
+              separator: /
+              source_labels:
+                - __meta_kubernetes_pod_uid
+                - __meta_kubernetes_pod_container_name
+              target_label: __path__
+        - job_name: kubernetes-pods-static
+          pipeline_stages:
+            - docker: {}
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels:
+                - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
+              action: keep
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_label_app_kubernetes_io_name
+              action: drop
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_label_app
+              action: drop
+              regex: .+
+            - source_labels:
+                - __meta_kubernetes_pod_name
+              target_label: pod
+            - source_labels:
+                - __meta_kubernetes_pod_namespace
+              target_label: namespace
+            - source_labels:
+                - __meta_kubernetes_pod_container_name
+              target_label: container
+            - replacement: /var/log/pods/*$1/*.log
+              separator: /
+              source_labels:
+                - __meta_kubernetes_pod_uid
+                - __meta_kubernetes_pod_container_name
+              target_label: __path__
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi 
